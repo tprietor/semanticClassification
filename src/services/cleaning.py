@@ -1,29 +1,12 @@
 import logging
 import re
+import unicodedata
 
 from bs4 import BeautifulSoup
 from ftfy import fix_text
 from markdown_it import MarkdownIt
 
-from src.config import settings
-from src.services.llm_client import get_anthropic_client
-
 logger = logging.getLogger(__name__)
-
-LIMPIEZA_LINGUISTICA_SYSTEM_PROMPT = """Eres un editor experto en textos académicos e institucionales sobre temas territoriales, socioambientales y de gobernanza en la Amazonía peruana.
-
-Recibes un texto que ya fue limpiado estructuralmente. Realiza una limpieza lingüística conservadora:
-
-1. Elimina la sección completa de "Referencias", "Bibliografía", "Fuentes consultadas" o cualquier sección similar, junto con todo su contenido desde ese punto en adelante.
-2. Elimina citas entre paréntesis de tipo académico: (Apellido, 2020), (Apellido y Otro, 2015), (Apellido et al., 2018), etc.
-3. Elimina notas al pie numeradas.
-4. Elimina líneas sueltas que sean referencias bibliográficas.
-5. NO elimines normas, leyes, decretos, resoluciones, ni citas institucionales.
-6. NO cambies el contenido semántico del texto. NO resumas, NO parafrasees, NO agregues información.
-7. Conserva los párrafos originales separados por doble salto de línea (\\n\\n).
-8. Conserva mayúsculas, puntuación y números.
-9. Devuelve SOLO el texto limpio, sin explicaciones ni comentarios adicionales."""
-
 
 class CleaningService:
     # --- Patrones de contacto ---
@@ -53,6 +36,74 @@ class CleaningService:
     _MULTISPACE = re.compile(r"\n{3,}")
     _SPACES = re.compile(r"[ \t]+")
     _SOLO_NUMERO = re.compile(r"^\s*\d{1,4}\s*\.?\s*$")
+    _MARKDOWN_HEADING = re.compile(r"^[ \t]{0,3}(#{1,6})[ \t]+(.+?)\s*$")
+    _REFERENCE_TITLE = re.compile(
+        r"(?:referencias(?: bibliograficas| biblograficas)?(?: consultadas)?|"
+        r"bibliografias?(?: consultadas?| citada)?|"
+        r"references(?: cited)?|bibliography|literature cited|fuentes consultadas)"
+    )
+    _BIBLIOGRAPHIC_ANNEX = re.compile(r"anexo\s+\d+[^\n]*bibliografico")
+    _NEW_DOCUMENT_PART = re.compile(r"(?:anexo|capitulo)\s+(?:\d+|[ivxlcdm]+)\b")
+    _END_MATTER = re.compile(
+        r"^[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*|__)?"
+        r"(?:Author Contributions|Funding|Acknowledg(?:e)?ments|"
+        r"Conflicts? of Interest|Contribuciones de los autores|Financiación|"
+        r"Financiamento|Agradecimientos?|Conflictos de interés)"
+        r"(?::)?(?:\*\*|__)?(?=[ \t]|$)",
+        re.IGNORECASE | re.MULTILINE,
+    )
+
+    @staticmethod
+    def _section_heading(line: str) -> tuple[int, str] | None:
+        match = CleaningService._MARKDOWN_HEADING.match(line)
+        if match:
+            level, title = len(match.group(1)), match.group(2)
+        elif CleaningService._END_MATTER.match(line):
+            level, title = 6, line
+        elif len(line) <= 100:
+            level, title = 6, line
+        else:
+            return None
+
+        title = re.sub(r"<[^>]+>", "", title)
+        title = title.strip(" *_#.:\t\n")
+        title = re.sub(r"^(?:\d+|[ivxlcdm]+|[a-z])(?:\.\d+)*[.)]?[ \t]+", "", title, flags=re.IGNORECASE)
+        title = title.strip(" *_#.:\t\n").casefold()
+        title = "".join(
+            char for char in unicodedata.normalize("NFKD", title)
+            if not unicodedata.combining(char)
+        )
+        title = re.sub(r"\s+", " ", title)
+        if match is None and not (
+            CleaningService._REFERENCE_TITLE.fullmatch(title)
+            or CleaningService._END_MATTER.match(line)
+        ):
+            return None
+        return level, title
+
+    @staticmethod
+    def _eliminar_secciones_editoriales_md(texto: str) -> str:
+        resultado: list[str] = []
+        skip_level: int | None = None
+        for line in texto.splitlines(keepends=True):
+            heading = CleaningService._section_heading(line)
+            if heading is not None:
+                level, title = heading
+                editorial = bool(
+                    CleaningService._REFERENCE_TITLE.fullmatch(title)
+                    or CleaningService._BIBLIOGRAPHIC_ANNEX.search(title)
+                    or CleaningService._END_MATTER.match(line)
+                )
+                if skip_level is not None and (
+                    level <= skip_level or CleaningService._NEW_DOCUMENT_PART.match(title)
+                ):
+                    skip_level = None
+                if editorial:
+                    skip_level = level if skip_level is None else min(skip_level, level)
+                    continue
+            if skip_level is None:
+                resultado.append(line)
+        return "".join(resultado)
 
     _IMG_BLOCK = re.compile(
         r"<!--\s*Start of picture text\s*-->.*?<!--\s*End of picture text\s*-->",
@@ -270,18 +321,18 @@ class CleaningService:
     def _eliminar_tablas(texto: str) -> str:
         lineas = texto.split("\n")
         resultado: list[str] = []
-        en_tabla = False
-
         for ln in lineas:
-            es_linea_tabla = "|" in ln
-            if es_linea_tabla:
-                en_tabla = True
+            if not ln.lstrip().startswith("|") or ln.count("|") < 2:
+                resultado.append(ln)
                 continue
-            if en_tabla:
-                if ln.strip() == "":
-                    continue
-                en_tabla = False
-            resultado.append(ln)
+
+            celdas = [celda.strip() for celda in re.split(r"(?<!\\)\|", ln.strip().strip("|"))]
+            if all(not celda or re.fullmatch(r":?-{3,}:?", celda) for celda in celdas):
+                continue
+            contenido = " ".join(celda for celda in celdas if celda)
+            contenido = re.sub(r"<br\s*/?>", " ", contenido, flags=re.IGNORECASE)
+            if contenido:
+                resultado.append(contenido)
 
         return "\n".join(resultado)
 
@@ -290,6 +341,8 @@ class CleaningService:
         md = MarkdownIt("commonmark")
         html = md.render(texto_md)
         soup = BeautifulSoup(html, "html.parser")
+        for tag in soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"]):
+            tag.insert_after("\n\n")
         return soup.get_text()
 
     @staticmethod
@@ -372,7 +425,7 @@ class CleaningService:
             return True
         palabras = set(re.findall(r"\b\w+\b", linea_lower))
         instituciones = palabras & CleaningService._INSTITUCION_PALABRAS
-        if len(instituciones) >= 2:
+        if len(linea.split()) <= 22 and len(instituciones) >= 2:
             return True
         if any(header in anterior_lower for header in CleaningService._HEADERS_AUTORIA):
             if CleaningService._es_lista_nombres(linea):
@@ -585,6 +638,9 @@ class CleaningService:
         texto = fix_text(texto_md)
         CleaningService._log_paso("fix_text", texto_md, texto)
 
+        texto = CleaningService._eliminar_secciones_editoriales_md(texto)
+        CleaningService._log_paso("eliminar_referencias", texto_md, texto)
+
         texto = CleaningService._limpiar_placeholders_imagenes(texto)
         CleaningService._log_paso("limpiar_placeholders_imagenes", texto_md, texto)
 
@@ -614,83 +670,3 @@ class CleaningService:
 
         logger.info("Limpieza estructural finalizada")
         return texto
-
-    # --- API pública: limpieza lingüística con Anthropic ---
-
-    @staticmethod
-    def _partir_por_parrafos(texto: str, max_chars: int) -> list[str]:
-        """Divide texto en chunks por párrafos que quepan en max_chars."""
-        parrafos = [p for p in texto.split("\n\n") if p.strip()]
-        if not parrafos:
-            return []
-        if len(texto) <= max_chars:
-            return [texto]
-
-        chunks: list[str] = []
-        chunk_actual: list[str] = []
-        chars_actual = 0
-
-        for p in parrafos:
-            p_len = len(p) + 2
-            if chars_actual + p_len > max_chars and chunk_actual:
-                chunks.append("\n\n".join(chunk_actual))
-                chunk_actual = []
-                chars_actual = 0
-            chunk_actual.append(p)
-            chars_actual += p_len
-
-        if chunk_actual:
-            chunks.append("\n\n".join(chunk_actual))
-
-        return chunks
-
-    @staticmethod
-    def linguisticCleaning(texto: str) -> str:
-        """
-        Limpieza lingüística con Anthropic Claude.
-        - Elimina referencias bibliográficas
-        - Elimina citas entre paréntesis
-        - Elimina notas al pie
-        - Conserva párrafos
-        """
-        logger.info("Iniciando limpieza lingüística con Anthropic")
-
-        if not texto or not texto.strip():
-            return ""
-
-        max_chunk = getattr(settings, "NER_MAX_CHUNK_LEN", 48000)
-        chunks = CleaningService._partir_por_parrafos(texto, max_chunk)
-
-        if len(chunks) > 1:
-            logger.info(
-                "Texto dividido en %d chunks para limpieza lingüística", len(chunks)
-            )
-
-        client = get_anthropic_client()
-        partes_limpias: list[str] = []
-
-        for i, chunk in enumerate(chunks):
-            if len(chunks) > 1:
-                logger.info(
-                    "Limpiando chunk %d/%d (%d caracteres)",
-                    i + 1,
-                    len(chunks),
-                    len(chunk),
-                )
-
-            response = client.messages.create(
-                model=settings.ANTHROPIC_MODEL,
-                max_tokens=8192,
-                system=LIMPIEZA_LINGUISTICA_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": chunk}],
-            )
-
-            parte_limpia = response.content[0].text if response.content else ""
-            if parte_limpia:
-                partes_limpias.append(parte_limpia)
-
-        resultado = "\n\n".join(partes_limpias) if partes_limpias else texto
-        CleaningService._log_paso("limpieza_linguistica_anthropic", texto, resultado)
-
-        logger.info("Limpieza lingüística finalizada")
-        return resultado

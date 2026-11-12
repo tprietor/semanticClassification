@@ -33,9 +33,9 @@ data/
 │   ├── sentences_repo.py          ← reemplazo/elimina oraciones por documento
 │   └── storage.py                 ← guardar, leer, eliminar, preparar_nombre
  └── services/
-      ├── cleaning.py            ← CleaningService: structuralCleaning(regex) + linguisticCleaning(Anthropic)
+      ├── cleaning.py            ← CleaningService: limpieza determinista de Markdown a texto
       ├── documents.py           ← DocumentService + todas las excepciones
-      ├── llm_client.py          ← Cliente Anthropic compartido
+      ├── llm_client.py          ← Cliente Anthropic para tareas LLM
       ├── ner.py                 ← Extracción few-shot (Anthropic + ejemplos curados + tool schema)
       ├── fuzzy_matching.py      ← resolución determinista de entidades v2
       ├── network.py             ← orquestación por corpus/incubadora/documento
@@ -164,27 +164,27 @@ POST /documents/clean-batch
      → Storage.leer(converted_path)     → lee el .md
      → CleaningService.structuralCleaning()
          → ftfy.fix_text()              → repara encoding
+         → elimina secciones bibliográficas y editoriales por encabezados Markdown
          → elimina placeholders de imágenes
          → elimina headers/footers repetidos
-         → markdown_it.MarkdownIt()     → parsea MD → extrae texto plano
+         → markdown_it.MarkdownIt()     → parsea MD → texto plano con párrafos
          → regex URL/email/teléfono     → elimina datos de contacto
          → elimina metadata de autoria (autores, facilitadores, revisores, directores)
          → elimina direcciones postales, notas legales, copyright y créditos
-         → elimina índices/tablas de contenido, tablas Markdown y headers de anexos
+         → elimina índices/tablas de contenido y headers de anexos; conserva texto de celdas
          → elimina prefijos de numeración de secciones, subsecciones e items
          → elimina números de página y líneas muy cortas
          → deduplica párrafos consecutivos
          → _MULTISPACE + _SPACES + strip → normaliza whitespace (mantiene mayúsculas)
-      → CleaningService.linguisticCleaning()
-          → Anthropic API (claude-sonnet)      → prompt de limpieza lingüística
-          → elimina referencias, citas, notas al pie
-          → preserva párrafos (\n\n)
       → Storage.guardar()                → s3/archivosLimpiados/{id}.txt
       → doc.cleaned_path = path          → guarda ruta en DB
       → DocumentRepo.actualizar_status() → status = 'cleaned'
    ← 200 OK
 
-linguisticCleaning() fue migrado de regex a Anthropic Claude (Jul 2026). Recibe el texto post-structuralCleaning, lo chunkifica por párrafos si es largo, lo envía a Claude con un prompt especializado, y devuelve el texto con párrafos preservados.
+La limpieza vigente es determinista y no llama a Anthropic. Conserva el idioma
+original y los párrafos; las citas dentro del cuerpo permanecen para evitar
+reescrituras o pérdidas de contenido. La eliminación de referencias depende de
+un encabezado Markdown reconocible; los demás formatos requieren revisión.
 
 limpiar_varios: busca todos en status "converted", limpia uno a uno con rollback por documento
 ```

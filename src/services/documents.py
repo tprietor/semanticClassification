@@ -274,7 +274,6 @@ class DocumentService:
             raise DocumentoError("Archivo convertido no encontrado o vacío", 500)
 
         texto_limpio = CleaningService.structuralCleaning(texto_md)
-        texto_limpio = CleaningService.linguisticCleaning(texto_limpio)
         nombre_txt = f"{doc.id}.txt"
 
         path = Storage.guardar(
