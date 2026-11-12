@@ -31,6 +31,7 @@ from src.api.schemas.entities import (
     ExtractEntitiesResponse,
     FuzzyMatchingResponse,
     MatchedEntityOut,
+    ResolvedEntitiesResponse,
 )
 from src.api.schemas.network import NetworkBuildResponse, TypedNetworkBuildResponse
 from src.services.documents import DocumentService, get_db
@@ -272,6 +273,59 @@ def fuzzy_matching(
     return FuzzyMatchingResponse(
         document_id=str(document_id),
         entities=[MatchedEntityOut(**e) for e in entidades],
+    )
+
+
+@router.get(
+    "/{document_id}/entities",
+    response_model=ResolvedEntitiesResponse,
+    summary="Consultar menciones resueltas de un documento",
+    description=(
+        "Devuelve las menciones guardadas por fuzzy matching, su contexto, "
+        "canónico y método de coincidencia. Es de solo lectura y admite filtros."
+    ),
+)
+def get_resolved_entities(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    category: Annotated[str | None, Query()] = None,
+    match_type: Annotated[str | None, Query()] = None,
+    canonical_id: Annotated[UUID | None, Query()] = None,
+    q: Annotated[str | None, Query(min_length=1)] = None,
+):
+    doc, total, category_counts, match_type_counts, entities = (
+        DocumentService.leer_entidades_resueltas(
+            db,
+            document_id,
+            skip=skip,
+            limit=limit,
+            category=category,
+            match_type=match_type,
+            canonical_id=canonical_id,
+            q=q,
+        )
+    )
+    return ResolvedEntitiesResponse(
+        document_id=doc.id,
+        original_filename=doc.original_filename,
+        status=doc.status,
+        language=doc.language,
+        productive_sector=doc.productive_sector,
+        document_total=sum(category_counts.values()),
+        category_counts=category_counts,
+        match_type_counts=match_type_counts,
+        applied_filters={
+            "category": category,
+            "match_type": match_type,
+            "canonical_id": str(canonical_id) if canonical_id else None,
+            "q": q,
+        },
+        total=total,
+        skip=skip,
+        limit=limit,
+        entities=entities,
     )
 
 

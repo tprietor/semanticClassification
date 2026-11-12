@@ -1,15 +1,19 @@
 import json
 import logging
+from uuid import UUID
 
 from fastapi import UploadFile
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 from src.config import settings
 from src.models.database import get_db  # noqa: F401 — pasamanos para api
+from src.models.canonical_entities import CanonicalEntity
 from src.models.documents import Document
 from src.models.documents_repo import DocumentRepo
+from src.models.entities import Entity
 from src.models.entities_repo import EntityRepo
 from src.models.sentences_repo import SentenceRepo
 from src.models.storage import Storage
@@ -74,6 +78,92 @@ class ClasificacionVacia(DocumentoError):
 
 
 class DocumentService:
+
+    @staticmethod
+    def leer_entidades_resueltas(
+        db: Session,
+        document_id: UUID,
+        *,
+        skip: int,
+        limit: int,
+        category: str | None = None,
+        match_type: str | None = None,
+        canonical_id: UUID | None = None,
+        q: str | None = None,
+    ) -> tuple[Document, int, dict[str, int], dict[str, int], list[dict]]:
+        """Consulta las decisiones persistidas de fuzzy matching sin recalcularlas."""
+        doc = db.get(Document, document_id)
+        if doc is None:
+            raise DocumentoNoEncontrado(str(document_id))
+
+        category_counts = {
+            category: count
+            for category, count in db.execute(
+                select(Entity.category, func.count(Entity.id))
+                .where(Entity.document_id == document_id)
+                .group_by(Entity.category)
+            )
+        }
+        match_type_counts = {
+            match_type or "sin método": count
+            for match_type, count in db.execute(
+                select(Entity.resolution_method, func.count(Entity.id))
+                .where(Entity.document_id == document_id)
+                .group_by(Entity.resolution_method)
+            )
+        }
+
+        filters = [Entity.document_id == document_id]
+        if category is not None:
+            filters.append(Entity.category == category)
+        if match_type is not None:
+            filters.append(Entity.resolution_method == match_type)
+        if canonical_id is not None:
+            filters.append(Entity.canonical_id == canonical_id)
+        if q is not None:
+            escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            filters.append(
+                or_(
+                    Entity.text.ilike(pattern, escape="\\"),
+                    CanonicalEntity.canonical_name.ilike(pattern, escape="\\"),
+                )
+            )
+
+        total = db.scalar(
+            select(func.count(Entity.id))
+            .join(CanonicalEntity, Entity.canonical_id == CanonicalEntity.id)
+            .where(*filters)
+        ) or 0
+        rows = db.execute(
+            select(Entity, CanonicalEntity.canonical_name, CanonicalEntity.category)
+            .join(CanonicalEntity, Entity.canonical_id == CanonicalEntity.id)
+            .where(*filters)
+            .order_by(Entity.position_start, Entity.position_end, Entity.id)
+            .offset(skip)
+            .limit(limit)
+        ).all()
+        entities = [
+            {
+                "id": entity.id,
+                "text": entity.text,
+                "category": entity.category,
+                "start": entity.position_start,
+                "end": entity.position_end,
+                "sentence_id": entity.sentence_id,
+                "context": entity.context,
+                "ambiguity": entity.ambiguity,
+                "canonical_id": entity.canonical_id,
+                "canonical_name": canonical_name,
+                "canonical_category": canonical_category,
+                "match_type": entity.resolution_method,
+                "match_score": entity.resolution_score,
+                "resolution_version": entity.resolution_version,
+                "resolution_details": entity.resolution_details,
+            }
+            for entity, canonical_name, canonical_category in rows
+        ]
+        return doc, total, category_counts, match_type_counts, entities
 
     @staticmethod
     def cargar_documento(
