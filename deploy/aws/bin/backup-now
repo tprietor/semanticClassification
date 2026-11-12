@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Respalda la base en EC2 y trae a la Mac la base y s3/ actuales.
+set -euo pipefail
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+"$BIN_DIR/ec2-ssh" '~/semantic-backup-db.sh'
+"$BIN_DIR/pull-db-backup"
+"$BIN_DIR/pull-s3-backup"

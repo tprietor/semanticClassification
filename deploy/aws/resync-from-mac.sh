@@ -9,6 +9,11 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 STATE=deploy/aws/.state.env
 [ -f "$STATE" ] || { echo "Falta $STATE (ver deploy/aws/AGENT-RUNBOOK.md, paso 0)." >&2; exit 1; }
+DATA_PRIMARY=$(grep -E '^DATA_PRIMARY=' "$STATE" | tail -1 | cut -d= -f2- || true)
+if [ "$DATA_PRIMARY" != mac ]; then
+  echo "Resincronización bloqueada: solo se permite con DATA_PRIMARY=mac en $STATE. AWS podría contener datos más recientes." >&2
+  exit 1
+fi
 DB_MODE=$(grep -E '^DB_MODE=' "$STATE" | tail -1 | cut -d= -f2- || true)
 DB_CONTAINER="${DB_CONTAINER:-sc_database}"
 DB_USER="${POSTGRES_USER:-sc_user}"

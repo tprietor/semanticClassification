@@ -1,20 +1,53 @@
 # Despliegue en AWS (us-east-2)
 
-Guía paso a paso para llevar la API y la base PostgreSQL a AWS. El dashboard
-(`semantic-network-explorer`) se publica en Vercel y consume la API por HTTPS.
+Guía de despliegue y operación. El dashboard (`semantic-network-explorer`) está
+publicado en Vercel y consume la API de AWS por HTTPS.
+
+## Estado actual (2026-11-06)
+
+La API, el gateway y PostgreSQL están dentro de Docker **en el EC2**. La base no
+está en RDS. `s3/` es una carpeta del disco del EC2, no un bucket de Amazon S3.
+Las instrucciones de creación de RDS más abajo son una opción histórica, no la
+arquitectura actualmente desplegada.
+
+```
+Vercel ──HTTPS──▶ EC2 :443 Caddy ──▶ API ──▶ PostgreSQL en el EC2
+Mac ──túnel SSH──▶ EC2 ├── PostgreSQL: pgAdmin en 127.0.0.1:15432
+                       └── API completa: Postman en 127.0.0.1:18000
+```
+
+Para trabajar con la API y la base de AWS desde la Mac no hace falta Docker local.
+Abre `deploy/aws/bin/db-tunnel` en una terminal y déjala abierta. pgAdmin tiene
+dos registros separados: «AWS semantic_db (solo lectura)» (`sc_readonly`) y
+«AWS semantic_db (escritura)» (`sc_user`). El registro local «semantic_db» sigue
+apuntando a Docker Desktop; comprueba siempre el nombre antes de editar.
+
+**Fuente vigente:** Tania confirmó que el último despliegue de AWS es la versión
+válida. `DATA_PRIMARY=aws` bloquea `resync-from-mac.sh` para evitar sobrescribirla
+con la base local. La copia local y `Docker.raw` permanecen intactos.
+
+**Actualización de API — 2026-11-11:** se desplegó el pipeline `english`
+autorizado, validado con ocho pruebas en la imagen de producción. El POST
+`/documents/{document_id}/translate` prepara el archivo en `s3/english/` y
+avanza a `english`; el GET `/documents/{document_id}/english` lo descarga.
+Para documentos con idioma registrado `en`, el POST copia directamente el
+`cleaned` sin modificar sus bytes: no llama a Anthropic ni requiere una clave
+de API. El comportamiento se corrigió por indicación explícita de la usuaria
+después de un fallo inicial de saldo durante una verificación innecesaria.
+`70767dc6` ya está en `english`, con `language=en` y su `english_path`
+registrado; el POST y la descarga respondieron HTTP 200 y ambas versiones
+comparten SHA-256. La migración `f0a1b2c3d4e5` ya estaba aplicada.
+Evidencia final y respaldos:
+`export/english_passthrough_2026-11-11/deployment_result.json` y
+`endpoint_result.json` de la Mac. La corrección solo actualizó
+`src/services/documents.py` sobre los siete archivos del despliegue inicial;
+se conservaron las otras ediciones locales del servidor.
 
 > **Si eres un agente de IA**, sigue [`AGENT-RUNBOOK.md`](AGENT-RUNBOOK.md): define el
 > orden, las confirmaciones obligatorias y las comprobaciones de cada paso.
 
-```
-Vercel (dashboard) ──HTTPS──▶ EC2 :443 Caddy ── solo /analysis/explorer/v1/* ──▶ API :8000
-Tania (su IP) ─────HTTP─────▶ EC2 :8000 API completa (Postman)                      │
-                                                                                  ▼
-                                                      RDS PostgreSQL 16, sin acceso público
-```
-
 - **Público**: solo los endpoints de lectura del explorador, a través del gateway.
-- **Solo desde la IP de Tania**: la API completa (subir, procesar, borrar) y SSH.
+- **Solo por túnel SSH**: la API completa (subir, procesar, borrar) y PostgreSQL.
 - **Nunca público**: la base de datos.
 
 No hay autenticación todavía. Cualquiera que tenga la URL del gateway puede leer los
@@ -59,6 +92,10 @@ Antes de que se acaben los créditos o venza el plan, hay que pasar al plan pago
 AWS Settings para no perder los recursos.
 
 ---
+
+> Los pasos 1–7 siguientes documentan el plan inicial con RDS y acceso directo al
+> puerto 8000. **No son instrucciones para operar el despliegue actual.** Para el
+> trabajo diario usa «Estado actual», el túnel y «Respaldos y migraciones».
 
 ## Paso 1 — Preparar el project (una sola vez)
 
@@ -224,11 +261,12 @@ En Postman, Tania cambia la URL base de `http://localhost:8000` a
 `VITE_API_BASE_URL` se fija al construir. Si cambia el gateway, actualiza la variable y
 vuelve a desplegar.
 
-## Resincronizar el servidor con la Mac
+## Resincronizar el servidor con la Mac (solo antes del corte de datos)
 
-Mientras la Mac sea la base principal (se procesan documentos ahí), el servidor es una
-copia que hay que actualizar después de procesar documentos nuevos. Desde la raíz del
-repo, en la **Terminal** (no dentro del sandbox del agente, que bloquea SSH):
+Mientras la Mac sea la base principal, el servidor es una copia. **Este comando
+reemplaza la base de AWS** y solo funciona si `DATA_PRIMARY=mac` figura expresamente
+en `deploy/aws/.state.env`. Durante la transición y cuando AWS sea la fuente
+principal, queda bloqueado. Desde la raíz del repo:
 
 ```bash
 bash deploy/aws/resync-from-mac.sh
@@ -242,14 +280,84 @@ diferencias. El dashboard queda sin datos un par de minutos mientras corre.
 `s3/` se actualiza agregando y sobrescribiendo archivos; los que se borren en la Mac no
 se borran en el servidor.
 
+## Probar la base y la API de AWS desde la Mac sin Docker local
+
+El túnel SSH deja PostgreSQL accesible solo en la propia Mac y también permite usar
+la API completa desde Postman. No hace falta encender Docker Desktop para estas dos
+conexiones:
+
+```bash
+# Desde la raíz del repositorio.
+deploy/aws/bin/db-tunnel
+```
+
+Deja esa terminal abierta mientras trabajas. El script comprueba la IP pública de la
+Mac y, si cambió, permite SSH solo desde esa IP `/32` en el Security Group existente.
+Si AWS CLI indica que la sesión venció, ejecuta `aws login --profile tania-semantic`
+y vuelve a abrir el túnel.
+`Ctrl+C` cierra ambas conexiones. Si se reinicia el contenedor de PostgreSQL, vuelve
+a ejecutar el script para que descubra su nueva IP interna.
+
+| Herramienta | Dirección local | Acceso |
+|---|---|---|
+| pgAdmin, servidor «AWS semantic_db (solo lectura)» | `127.0.0.1:15432`, base `semantic_db` | Usuario `sc_readonly`; su contraseña local está en `~/.ssh/semantic-db-readonly-password` |
+| Postman, URL base de la API | `http://127.0.0.1:18000` | API de producción en EC2 |
+
+El servidor anterior «semantic_db» de pgAdmin apunta al PostgreSQL local y solo
+responde con Docker Desktop encendido. Para editar AWS, selecciona expresamente
+«AWS semantic_db (escritura)». Su contraseña se solicita al conectar y no se guardó
+en pgAdmin. En Postman, selecciona el entorno **«AWS por túnel»**, cuyo `apiUrl` es
+`http://127.0.0.1:18000`; `GET Health` respondió `200 OK` el 6 de noviembre. Los
+endpoints escriben tanto en la base como en el `s3/` del EC2.
+
+### Respaldos y migraciones
+
+El EC2 ejecuta `~/semantic-backup-db.sh` cada día a las **03:17 UTC**. Hace un
+`pg_dump` en formato personalizado, lo lee por completo con `pg_restore` para
+verificarlo y conserva siete días en `~/semantic-db-backups/`. El primer respaldo
+quedó verificado el 6 de noviembre. Para traer el último a la Mac:
+
+```bash
+deploy/aws/bin/pull-db-backup
+```
+
+El respaldo de la base no incluye los documentos de `s3/`; esa carpeta aún requiere
+una copia fuera del EC2 para proteger documentos nuevos. La copia local contiene los
+archivos existentes en AWS: la comparación por contenido del 6 de noviembre encontró
+1.386 archivos idénticos entre la Mac y AWS. Para traer los
+archivos nuevos o modificados de AWS sin borrar los locales:
+
+```bash
+deploy/aws/bin/pull-s3-backup
+```
+
+Si reemplaza un archivo local, guarda la versión anterior bajo
+`export/s3-previous/`. Ejecuta `pull-db-backup` y `pull-s3-backup` después de procesar
+documentos o modificar la base. Para hacer ambos y crear un respaldo nuevo de la base
+en un solo paso, ejecuta `deploy/aws/bin/backup-now`. La tarea diaria en EC2 respalda
+solo PostgreSQL. Una copia automática de `s3/` fuera del EC2 sigue pendiente. Tampoco existe
+restauración automática de RDS, porque se está usando PostgreSQL dentro del EC2.
+
+Las migraciones se aplican **en el contenedor API del EC2**, sin Docker local:
+
+```bash
+deploy/aws/bin/ec2-ssh 'cd ~/semanticClassification && docker compose -f docker-compose.prod.yml --profile local-db exec -T api alembic current'
+deploy/aws/bin/pull-db-backup
+deploy/aws/bin/ec2-ssh 'cd ~/semanticClassification && docker compose -f docker-compose.prod.yml --profile local-db exec -T api alembic upgrade head'
+```
+
+Primero despliega el código que contiene la migración; `alembic upgrade head` solo
+puede aplicar versiones presentes en la imagen del API. El despliegue automático ya
+ejecuta ese comando después de actualizar la imagen.
+
 ## Operación diaria
 
 | Tarea | Comando o acción |
 |---|---|
 | Actualizar a la última versión de la rama | Automático con cada push, si está configurado [`CI-CD.md`](CI-CD.md). A mano, en el EC2: `bash deploy/aws/deploy-on-ec2.sh $(git rev-parse origin/feat/explorador-entidades)` |
-| Ver logs | `docker compose -f docker-compose.prod.yml logs -f api` |
-| Reiniciar | `docker compose -f docker-compose.prod.yml restart` |
-| Aplicar migraciones | `docker compose -f docker-compose.prod.yml exec api alembic upgrade head` |
+| Ver logs | `deploy/aws/bin/ec2-ssh 'cd ~/semanticClassification && docker compose -f docker-compose.prod.yml logs --tail 100 api'` |
+| Reiniciar API | `deploy/aws/bin/ec2-ssh 'cd ~/semanticClassification && docker compose -f docker-compose.prod.yml restart api'` |
+| Aplicar migraciones | Ejecutar los tres comandos de «Respaldos y migraciones» |
 | Apagar el servidor | `aws ec2 stop-instances --instance-ids <id> --profile <perfil> --region us-east-2` |
 | Encenderlo | `aws ec2 start-instances --instance-ids <id> --profile <perfil> --region us-east-2` |
 | Consultar créditos | `aws freetier get-account-plan-state --profile <perfil> --region us-east-2` |
@@ -257,10 +365,8 @@ se borran en el servidor.
 Los servicios se levantan solos al encender el EC2 (`restart: unless-stopped`). La IP
 elástica no cambia al apagar y encender.
 
-Los backups automáticos de RDS se restauran desde *RDS → Automated backups*. La
-carpeta `s3/` vive en el disco del EC2; antes de usar el servidor como única fuente de
-documentos, conviene programar snapshots del volumen (*EC2 → Lifecycle Manager*) o
-moverla a un bucket S3.
+La carpeta `s3/` vive en el disco del EC2. Antes de usar el servidor como única fuente
+de documentos, hay que programar snapshots del volumen o copiarla a un bucket S3.
 
 ## Pendientes conocidos
 

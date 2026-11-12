@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Da acceso SSH al EC2 desde la IP pública actual de esta Mac.
+# Solo retira la IP previa que este mismo script haya registrado.
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+source "$BIN_DIR/_state.sh"
+: "${EC2_SG:?Falta EC2_SG en deploy/aws/.state.env}"
+: "${EIP:?Falta EIP en deploy/aws/.state.env}"
+
+CURRENT_IP=$(curl -fsS --max-time 10 https://checkip.amazonaws.com | tr -d '\n')
+if ! [[ "$CURRENT_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "No se pudo determinar la IP pública de esta Mac." >&2
+  exit 1
+fi
+CURRENT_CIDR="$CURRENT_IP/32"
+CIDR_FILE="$HOME/.ssh/semantic-ec2-current-cidr"
+PREVIOUS_CIDR=$(cat "$CIDR_FILE" 2>/dev/null || true)
+
+ALLOWED_CIDRS=$("$BIN_DIR/aws-project" ec2 describe-security-groups \
+  --group-ids "$EC2_SG" \
+  --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`].IpRanges[].CidrIp' \
+  --output text)
+if ! [[ " $ALLOWED_CIDRS " == *"$CURRENT_CIDR"* ]]; then
+  "$BIN_DIR/aws-project" ec2 authorize-security-group-ingress \
+    --group-id "$EC2_SG" --protocol tcp --port 22 --cidr "$CURRENT_CIDR" \
+    --query Return --output text >/dev/null
+fi
+
+if ! nc -G 5 -z "$EIP" 22 >/dev/null 2>&1; then
+  echo "La IP actual está autorizada, pero el puerto SSH aún no responde." >&2
+  exit 1
+fi
+
+if [[ "$PREVIOUS_CIDR" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/32$ ]] &&
+   [ "$PREVIOUS_CIDR" != "$CURRENT_CIDR" ] &&
+   [[ " $ALLOWED_CIDRS " == *"$PREVIOUS_CIDR"* ]]; then
+  "$BIN_DIR/aws-project" ec2 revoke-security-group-ingress \
+    --group-id "$EC2_SG" --protocol tcp --port 22 --cidr "$PREVIOUS_CIDR" \
+    --query Return --output text >/dev/null
+fi
+
+printf '%s\n' "$CURRENT_CIDR" > "$CIDR_FILE"
+chmod 600 "$CIDR_FILE"
+echo "Acceso SSH listo desde $CURRENT_CIDR."

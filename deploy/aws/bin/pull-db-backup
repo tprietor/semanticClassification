@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Descarga a export/ el respaldo más reciente de PostgreSQL del EC2.
+set -euo pipefail
+source "$(dirname "$0")/_state.sh"
+: "${EIP:?Falta EIP en deploy/aws/.state.env}"
+
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+mkdir -p "$ROOT/export"
+latest="$(ssh -i "$SSH_KEY" -o BatchMode=yes "ubuntu@$EIP" \
+  'find "$HOME/semantic-db-backups" -maxdepth 1 -type f -name "semantic_db_*.dump" -print | sort | tail -1')"
+if [[ "$latest" != /home/ubuntu/semantic-db-backups/semantic_db_*.dump ]]; then
+  echo "No hay un respaldo válido en EC2." >&2
+  exit 1
+fi
+target="$ROOT/export/aws_$(basename "$latest")"
+partial="$target.partial"
+trap 'if [ -f "$partial" ]; then mv "$partial" "$target.incomplete"; fi' EXIT
+scp -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 \
+  -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+  "ubuntu@$EIP:$latest" "$partial"
+test -s "$partial"
+mv "$partial" "$target"
+trap - EXIT
+echo "Respaldo descargado: $target ($(du -h "$target" | cut -f1))"

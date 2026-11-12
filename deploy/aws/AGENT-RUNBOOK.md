@@ -1,5 +1,13 @@
 # Runbook de despliegue para agentes de IA
 
+> **Estado 2026-11-06:** la API y PostgreSQL ya están en el EC2; la base usa el
+> perfil `local-db`, no RDS. `s3/` es una carpeta del EC2. El túnel de
+> `deploy/aws/bin/db-tunnel` da acceso a Postman y pgAdmin sin Docker local.
+> Tania confirmó que AWS es la versión válida; `DATA_PRIMARY=aws` bloquea
+> `resync-from-mac.sh` para no sobrescribirla con PostgreSQL local. Los pasos de creación siguientes son históricos:
+> no los vuelvas a ejecutar en este project. Consulta el estado operativo en
+> [`README.md`](README.md).
+
 Instrucciones para que un agente de IA (Claude Code u otro) despliegue
 `semanticClassification` en AWS desde la Mac de Tania, donde están los datos. La
 explicación para personas está en [`README.md`](README.md); este archivo define el

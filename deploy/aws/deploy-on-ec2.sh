@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Despliega un commit concreto en el EC2: actualiza el código, reconstruye solo la
-# API y espera a que responda. No toca la base de datos (la resincronización desde la
-# Mac sigue siendo resync-from-mac.sh).
+# API y espera a que responda. No reemplaza los datos de PostgreSQL; sí aplica
+# migraciones Alembic de la nueva versión al final del despliegue.
 #
 # Lo ejecuta el despliegue automático (deploy/aws/autodeploy/autodeploy.sh) como el
 # usuario ubuntu. También sirve a mano:  bash deploy/aws/deploy-on-ec2.sh <commit>

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Copia a la Mac los archivos nuevos o modificados del s3/ del EC2.
+# Conserva las versiones locales reemplazadas en export/s3-previous/.
+set -euo pipefail
+source "$(dirname "$0")/_state.sh"
+: "${EIP:?Falta EIP en deploy/aws/.state.env}"
+
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+mkdir -p "$ROOT/s3"
+previous="$ROOT/export/s3-previous/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$previous"
+
+rsync -rltc --backup --backup-dir="$previous" \
+  --rsync-path='sudo -n rsync' \
+  -e "ssh -i $SSH_KEY -o BatchMode=yes" \
+  "ubuntu@$EIP:/home/ubuntu/semanticClassification/s3/" "$ROOT/s3/"
+echo "Copia de s3/ terminada. Versiones reemplazadas: $previous"
