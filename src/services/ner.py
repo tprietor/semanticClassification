@@ -138,6 +138,13 @@ _ABBREVIATIONS = {
     "ej.",
     "p.",
     "pp.",
+    "al.",
+    "fig.",
+    "figs.",
+    "ref.",
+    "refs.",
+    "sect.",
+    "conf.",
     "n.º",
     "n°.",
 }
@@ -150,11 +157,13 @@ def _es_limite_oracion(texto: str, boundary_start: int, boundary_end: int) -> bo
 
     prefix = texto[:boundary_start].rstrip()
     token_match = re.search(r"(\S+)$", prefix)
-    token = token_match.group(1).casefold() if token_match else ""
+    token = token_match.group(1).casefold().lstrip("([{‘“'\"") if token_match else ""
     if token in _ABBREVIATIONS or re.fullmatch(r"[a-záéíóúñ]\.", token):
         return False
 
     suffix = texto[boundary_end:].lstrip()
+    if token == "p.a." and suffix.startswith("("):
+        return False
     if suffix and suffix[0].islower():
         return False
     return True

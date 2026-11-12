@@ -60,6 +60,36 @@ class NerProviderValidationTests(unittest.TestCase):
 
 
 class NerMentionPositionTests(unittest.TestCase):
+    def test_et_al_citation_does_not_split_sentence(self) -> None:
+        text = "Chamberlain et al. [23] studied agroforestry. Farmers participated."
+        sentences = _segmentar_oraciones(text, 0)
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["text"], "Chamberlain et al. [23] studied agroforestry.")
+
+    def test_figure_and_reference_citations_do_not_split_sentence(self) -> None:
+        text = "Rainfall changed (Fig. 1a), as reported in ref. 67. Forests recovered."
+        sentences = _segmentar_oraciones(text, 0)
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["text"], "Rainfall changed (Fig. 1a), as reported in ref. 67.")
+
+    def test_section_citation_does_not_split_sentence(self) -> None:
+        text = 'See Sect. "Results" for the agroforestry findings. Farmers participated.'
+        sentences = _segmentar_oraciones(text, 0)
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["text"], 'See Sect. "Results" for the agroforestry findings.')
+
+    def test_annual_rate_and_figure_citation_remain_together(self) -> None:
+        text = "Income rose 4% p.a. (Figure 5). Families adapted."
+        sentences = _segmentar_oraciones(text, 0)
+        self.assertEqual([s["text"] for s in sentences],
+                         ["Income rose 4% p.a. (Figure 5).", "Families adapted."])
+
+    def test_confer_figure_citation_remains_in_sentence(self) -> None:
+        text = "Credit was scarce (conf. Figure 8). Farmers invested."
+        sentences = _segmentar_oraciones(text, 0)
+        self.assertEqual([s["text"] for s in sentences],
+                         ["Credit was scarce (conf. Figure 8).", "Farmers invested."])
+
     def test_loc_inside_char_survives_in_either_response_order(self) -> None:
         text = "La comunidad de San Pedro decidió participar."
         sentences = _segmentar_oraciones(text, 83)
