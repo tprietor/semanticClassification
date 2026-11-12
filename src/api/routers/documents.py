@@ -12,6 +12,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from src.api.schemas.documents import (
@@ -25,6 +26,7 @@ from src.api.schemas.documents import (
     ProductiveSector,
     SetLanguageBatchRequest,
     SetLanguageBatchResponse,
+    TranslationResponse,
 )
 from src.api.schemas.entities import (
     EntityOut,
@@ -226,6 +228,26 @@ def clean_batch(
 ):
     resultado = DocumentService.limpiar_varios(db)
     return BatchProcessResponse(**resultado)
+
+
+@router.post("/{document_id}/translate", response_model=TranslationResponse)
+def translate_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+):
+    return DocumentService.traducir(db, str(document_id))
+
+
+@router.get("/{document_id}/english", response_class=PlainTextResponse)
+def get_english_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+):
+    content = DocumentService.leer_english(db, str(document_id))
+    return PlainTextResponse(
+        content,
+        headers={"Content-Disposition": f'attachment; filename="{document_id}.txt"'},
+    )
 
 
 @router.post("/{document_id}/revert", status_code=status.HTTP_200_OK)

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     STORAGE_RAW: Path = Path("s3/archivosCrudos")
     STORAGE_CONVERTED: Path = Path("s3/archivosConvertidos")
     DATA_CLEANED: Path = Path("s3/archivosLimpiados")
+    STORAGE_ENGLISH: Path = Path("s3/english")
     STORAGE_IMAGES: Path = Path("s3/imagenesExtraidas")
     STORAGE_NER: Path = Path("s3/archivosNER")
     STORAGE_GRAPHS: Path = Path("s3/graphs")
@@ -20,6 +21,8 @@ class Settings(BaseSettings):
     NER_MAX_CHUNK_LEN: int = 12_000
     NER_CODEBOOK_PATH: Path = Path("data/codebooks/codebook_en_construccion_en.md")
     NER_PROMPT_PATH: Path = Path("data/prompts/ner_prompt.md")
+    TRANSLATION_PROMPT_PATH: Path = Path("data/prompts/translation_prompt.md")
+    TRANSLATION_MAX_CHUNK_CHARS: int = 8000
     SEMANTIC_NODE_PROMPT_PATH: Path = Path("data/prompts/semantic_node_prompt.md")
 
     class Config:

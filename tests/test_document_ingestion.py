@@ -181,6 +181,7 @@ class DocumentIngestionTests(unittest.TestCase):
             file_path="s3/archivosCrudos/document-id.pdf",
             converted_path=None,
             cleaned_path=None,
+            english_path=None,
             ner_path=None,
             images_path="s3/imagenesExtraidas/document-id",
         )

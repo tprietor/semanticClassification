@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import UploadFile
@@ -25,6 +26,11 @@ from src.services.fuzzy_matching import (
 )
 from src.services.ner import extraer_entidades
 from src.services.pdf_converter import PdfConverter
+from src.services.translation import (
+    LanguageMismatchError,
+    TranslationError,
+    translate_to_english,
+)
 
 
 class DocumentoError(Exception):
@@ -232,6 +238,7 @@ class DocumentService:
         Storage.eliminar(documento.file_path)
         Storage.eliminar(documento.converted_path)
         Storage.eliminar(documento.cleaned_path)
+        Storage.eliminar(documento.english_path)
         Storage.eliminar(documento.ner_path)
         Storage.eliminar_directorio(documento.images_path)
         DocumentRepo.eliminar(db, documento)
@@ -390,20 +397,89 @@ class DocumentService:
         return {"processed": processed, "errors": errors}
 
     @staticmethod
+    def traducir(db: Session, document_id: str) -> dict:
+        """Copia los textos registrados en inglés; traduce los demás con el LLM."""
+        doc = DocumentRepo.leer_uno(db, document_id)
+        if doc is None:
+            raise DocumentoNoEncontrado(document_id)
+        if doc.status != "cleaned":
+            raise DocumentoError(
+                f"Documento {document_id} debe estar en estado 'cleaned' "
+                f"(estado actual: '{doc.status}')",
+                409,
+            )
+        language = (doc.language or "").strip().lower()
+        if not language:
+            raise DocumentoError("El documento no tiene language registrado", 422)
+        if not doc.cleaned_path or Path(doc.cleaned_path).suffix.lower() != ".txt":
+            raise DocumentoError("El archivo cleaned debe ser un .txt", 500)
+        try:
+            source_bytes = Path(doc.cleaned_path).read_bytes()
+            source_text = source_bytes.decode("utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise DocumentoError("No se pudo leer el archivo cleaned en UTF-8", 500) from exc
+        if not source_text.strip():
+            raise DocumentoError("El archivo cleaned está vacío", 500)
+
+        is_english = language.split("-", 1)[0] == "en"
+        try:
+            if is_english:
+                english_bytes = source_bytes
+            else:
+                english_bytes = translate_to_english(
+                    source_text, language, document_title=doc.original_filename
+                ).encode("utf-8")
+        except LanguageMismatchError as exc:
+            raise DocumentoError(str(exc), 422) from exc
+        except TranslationError as exc:
+            raise DocumentoError(f"Traducción incompleta: {exc}", 502) from exc
+
+        english_path = Storage.guardar(
+            english_bytes, f"{doc.id}.txt", settings.STORAGE_ENGLISH
+        )
+        doc.english_path = str(english_path)
+        try:
+            DocumentRepo.actualizar_status(db, doc, "english")
+        except Exception:
+            db.rollback()
+            Storage.eliminar(str(english_path))
+            raise
+        return {
+            "document_id": doc.id,
+            "source_language": language,
+            "target_language": "en",
+            "status": "english",
+            "translated": not is_english,
+            "english_path": str(english_path),
+        }
+
+    @staticmethod
+    def leer_english(db: Session, document_id: str) -> str:
+        doc = DocumentRepo.leer_uno(db, document_id)
+        if doc is None:
+            raise DocumentoNoEncontrado(document_id)
+        if not doc.english_path:
+            raise DocumentoError("El documento no tiene archivo english", 404)
+        content = Storage.leer(doc.english_path)
+        if content is None:
+            raise DocumentoError("El archivo english no existe", 404)
+        return content
+
+    @staticmethod
     def extraer_entidades_de_documento(db: Session, document_id: str) -> list[dict]:
         """Extrae entidades NER y guarda el resultado como un archivo JSON."""
         doc = DocumentRepo.leer_uno(db, document_id)
         if doc is None:
             raise DocumentoNoEncontrado(document_id)
 
-        if doc.status != "cleaned":
+        if doc.status != "english":
             raise DocumentoError(
-                f"Documento {document_id} no está limpio (status: '{doc.status}')", 409
+                f"Documento {document_id} no está en english (status: '{doc.status}')", 409
             )
 
-        texto = doc.cleaned_path and Storage.leer(doc.cleaned_path)
+        texto = doc.english_path and Storage.leer(doc.english_path)
         if not texto:
-            raise DocumentoError("Archivo limpio no encontrado o vacío", 500)
+            raise DocumentoError("Archivo english no encontrado o vacío", 500)
 
         logger.info("Extrayendo entidades para documento %s", document_id)
         entidades = extraer_entidades(
@@ -435,7 +511,7 @@ class DocumentService:
 
     @staticmethod
     def extraer_entidades_de_varios(db: Session) -> dict:
-        docs = DocumentRepo.leer_por_status(db, "cleaned")
+        docs = DocumentRepo.leer_por_status(db, "english")
         processed: list[str] = []
         errors: list[dict] = []
 
@@ -556,14 +632,23 @@ class DocumentService:
             if doc.ner_path:
                 Storage.eliminar(doc.ner_path)
             doc.ner_path = None
+            DocumentRepo.actualizar_status(
+                db, doc, "english" if doc.english_path else "cleaned"
+            )
+        elif doc.status == "english":
+            Storage.eliminar(doc.english_path)
+            doc.english_path = None
             DocumentRepo.actualizar_status(db, doc, "cleaned")
         elif doc.status == "cleaned":
             if doc.cleaned_path:
                 Storage.eliminar(doc.cleaned_path)
             if doc.ner_path:
                 Storage.eliminar(doc.ner_path)
+            if doc.english_path:
+                Storage.eliminar(doc.english_path)
             EntityRepo.eliminar_por_documento(db, doc.id)
             doc.cleaned_path = None
+            doc.english_path = None
             doc.ner_path = None
             DocumentRepo.actualizar_status(db, doc, "converted")
         elif doc.status == "converted":

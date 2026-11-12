@@ -56,6 +56,7 @@ class DocumentRead(BaseModel):
     metadata: dict[str, Any] | None = Field(None, validation_alias="metadata_")
     converted_path: str | None = None
     cleaned_path: str | None = None
+    english_path: str | None = None
     ner_path: str | None = None
     images_path: str | None = None
 
@@ -106,3 +107,12 @@ class DocumentListResponse(BaseModel):
 class BatchProcessResponse(BaseModel):
     processed: list[UUID]
     errors: list[BatchProcessError]
+
+
+class TranslationResponse(BaseModel):
+    document_id: UUID
+    source_language: str
+    target_language: str = "en"
+    status: str = "english"
+    translated: bool
+    english_path: str
