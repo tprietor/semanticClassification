@@ -231,6 +231,31 @@ _SAF_ALIASES = frozenset(
     )
 )
 
+# Los nombres inequívocos de la institución son actores. El matching no debe
+# crear un canónico LOC a partir de un error previo de etiquetado NER.
+# No incluye "WA" ni "Wyss": esas formas cortas requieren contexto.
+_WYSS_INSTITUTION_FORMS = frozenset(
+    normalizar_nombre(form)
+    for form in (
+        "Wyss Academy",
+        "The Wyss Academy",
+        "Wyss Academy for Nature",
+        "The Wyss Academy for Nature",
+        "Wyss Academy (WA)",
+        "Wyss Academy Hub SAM",
+        "Wyss Academy SAM Hub",
+        "WA SAM Hub",
+        "Wyss Academy Hub South America",
+        "Wyss Academy South America Hub",
+        "Wyss Academy for Nature at the University of Bern",
+        "The Wyss Academy for Nature at the University of Bern",
+    )
+)
+
+_AGROFORESTRY_SYSTEM_FORMS = frozenset(
+    normalizar_nombre(form) for form in ("agroforestry systems",)
+)
+
 
 def canonicalizar_actor_generico(texto: str) -> str | None:
     """Devuelve una forma singular segura para ciertos actores genéricos CHAR.
@@ -313,6 +338,16 @@ def _validar_mencion(mencion: dict[str, Any], index: int) -> None:
     if categoria not in VALID_CATEGORIES:
         raise FuzzyMatchingDataError(
             f"La entidad {index} tiene category inválida: {categoria!r}"
+        )
+    if normalizar_nombre(texto) in _WYSS_INSTITUTION_FORMS and categoria != "CHAR":
+        raise FuzzyMatchingDataError(
+            f"La entidad {index} {texto!r} debe ser CHAR, no {categoria!r}; "
+            "corrige su categoría en el NER antes de fuzzy matching"
+        )
+    if normalizar_nombre(texto) in _AGROFORESTRY_SYSTEM_FORMS and categoria != "PRAC":
+        raise FuzzyMatchingDataError(
+            f"La entidad {index} {texto!r} debe ser PRAC, no {categoria!r}; "
+            "corrige su categoría en el NER antes de fuzzy matching"
         )
     if not isinstance(mencion.get("start"), int) or not isinstance(
         mencion.get("end"), int

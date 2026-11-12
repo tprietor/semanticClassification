@@ -8,6 +8,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 
 from src.models.canonical_entities import CanonicalEntity
 from src.services.fuzzy_matching import (
+    FuzzyMatchingDataError,
     RESOLUTION_VERSION,
     asociar_entidades_canonicas,
     canonicalizar_actor_generico,
@@ -51,6 +52,49 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
             normalizar_nombre("  RÍO   Madre de Dios "),
             "rio madre de dios",
         )
+
+    def test_wyss_institution_forms_must_be_char(self) -> None:
+        for text in ("Wyss Academy", "WA SAM Hub", "WA Sam Hub"):
+            with self.subTest(text=text), self.assertRaisesRegex(
+                FuzzyMatchingDataError, "debe ser CHAR"
+            ):
+                asociar_entidades_canonicas(self.db, [mention(text, "LOC")])
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_wa_sam_hub_char_is_accepted(
+        self, leer_todas: Mock, crear: Mock
+    ) -> None:
+        existing = canonical("WA SAM Hub", "CHAR")
+        leer_todas.return_value = [existing]
+
+        result, _ = asociar_entidades_canonicas(
+            self.db, [mention("WA Sam Hub", "CHAR")]
+        )
+
+        self.assertEqual(result[0]["canonical_id"], existing.id)
+        crear.assert_not_called()
+
+    def test_agroforestry_systems_cannot_be_loc(self) -> None:
+        with self.assertRaisesRegex(FuzzyMatchingDataError, "debe ser PRAC"):
+            asociar_entidades_canonicas(
+                self.db, [mention("Agroforestry Systems", "LOC")]
+            )
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_agroforestry_systems_prac_is_accepted(
+        self, leer_todas: Mock, crear: Mock
+    ) -> None:
+        existing = canonical("Agroforestry Systems", "PRAC")
+        leer_todas.return_value = [existing]
+
+        result, _ = asociar_entidades_canonicas(
+            self.db, [mention("agroforestry systems", "PRAC")]
+        )
+
+        self.assertEqual(result[0]["canonical_id"], existing.id)
+        crear.assert_not_called()
 
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
