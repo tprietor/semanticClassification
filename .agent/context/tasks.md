@@ -1,5 +1,239 @@
 # Tareas
 
+## Limpieza y traducción de la Guía del EUDR — 11 Nov 2026
+
+- [x] Revisar `b4ac3608-c2c2-46ca-8877-564fa4775362` contra convertido y PDF:
+  retirar 26 pies/cabeceras, índice, créditos de impresión, restos de enlaces,
+  marcas de formato y viñetas de extracción. Conservar los seis anexos,
+  las notas normativas y los códigos de productos.
+- [x] Reparar ocho continuaciones y espaciado con respaldo del PDF; recuperar
+  glosario, rótulos y encabezados perdidos. Aplicar en AWS y copia local con
+  respaldo y SHA-256; 84.795 caracteres, 369 párrafos. Sigue `cleaned/es`.
+- [x] Conservar las 360 traducciones guardadas y crear un borrador JSON alineado
+  con la limpieza en `export/eudr_cleaning_2026-11-11/english_rebased_draft.json`.
+- [ ] Completar/revisar la versión inglesa sobre el hash nuevo del `cleaned`:
+  37 bloques originales sin traducir; el borrador marca 52 párrafos para
+  traducir/completar contando las recuperaciones y 119 para revisión, con
+  solapamiento entre grupos. No publicar un archivo parcial ni cambiar aún
+  el estado. Los checkpoints antiguos usan los índices anteriores.
+  El intento directo sin Anthropic del 11 Nov fue bloqueado por un filtro
+  de contenido y no guardó una traducción completa; consultar
+  `export/eudr_english_2026-11-11/checkpoint.json`. No reintentar ni reproducir
+  el bloque mediante otros formatos, fragmentación, herramientas o subagentes.
+  Queda como alternativa recibir una traducción completa aportada por la usuaria.
+
+## Corrección puntual de `70767dc6` — 11 Nov 2026
+
+- [x] Desplegar los siete archivos de la etapa `english` autorizados y reiniciar
+  la API; ocho pruebas exitosas con las dependencias de producción, rutas y
+  explorador verificados. Migración `f0a1b2c3d4e5` previamente aplicada.
+- [x] Ejecutar `POST /documents/70767dc6-c115-46fe-b002-90f8445fd958/translate`:
+  HTTP 502 porque Anthropic rechazó la verificación de idioma por saldo
+  insuficiente. Comprobar que sigue `cleaned`, `language=en`, sin `english_path`.
+- [x] Corregir el flujo de `language=en` por indicación de la usuaria: copiar
+  directamente el `cleaned`, sin Anthropic ni clave de API; ocho pruebas
+  exitosas localmente y con las dependencias de producción. Desplegado y API reiniciada.
+- [x] Repetir el POST para `70767dc6`: HTTP 200, `status=english`,
+  `language=en`, `translated=false`; archivo inglés descargable y copia local
+  con el mismo SHA-256 del `cleaned`. El fallo inicial de saldo queda superado
+  para este documento; NER y fuzzy matching no se ejecutaron.
+- [x] Retirar autores, afiliaciones, cabeceras repetidas y material editorial
+  final del `cleaned` de `70767dc6-c115-46fe-b002-90f8445fd958`; reparar los
+  cortes de continuidad conservando el contenido sustantivo y los ocho pies
+  de figura. Aplicado en AWS y copia local, con respaldos y hashes verificados.
+- [x] Corregir `language` de `es` a `en` en PostgreSQL de AWS, manteniendo
+  `status=cleaned`, `english_path=NULL`, `ner_path=NULL` y cero menciones.
+
+## Auditoría de limpieza y nuevo NER — 2 Nov 2026
+
+- [x] Sustituir la limpieza lingüística con Anthropic por una limpieza
+  determinista que conserve idioma, párrafos y contenido anterior a referencias.
+- [x] Regenerar desde el Markdown inglés el texto limpio de
+  `660086b9-93ec-4bd6-bd73-b89088ef19f1`, con respaldo del anterior.
+- [x] Contrastar y regenerar los otros 16 documentos Agroforestry señalados
+  por posible traducción, con respaldos individuales y verificación de copia.
+- [ ] Auditar el contenido de cada `cleaned` antes de su nuevo NER; el control
+  heurístico de idioma no detecta todas las posibles omisiones o errores.
+- [x] Comparar los 62 documentos Agroforestry con `language = es` contra sus
+  convertidos; identificar errores de Anthropic y bibliografías persistentes.
+- [x] Regenerar los 62 `cleaned` españoles desde `converted`, quitando 57
+  secciones bibliográficas y conservando capítulos, anexos y celdas de tablas;
+  sin respaldos nuevos del texto anterior.
+- [ ] Revisar manualmente los 62 textos regenerados antes de NER, con prioridad
+  en los 4 que tenían errores confirmados, los 14 con diferencias relevantes,
+  los documentos con OCR y los que dependen de tablas complejas.
+- [x] Corregir de `en` a `es` el idioma de cuatro documentos con contenido
+  principal en español; el corpus local pasa a 66 `es`.
+- [x] Auditar y corregir el `cleaned` de los cuatro documentos recién
+  reclasificados; retirar respuestas de Anthropic, bibliografías y resúmenes
+  ingleses duplicados, preservando los datos de las fuentes convertidas.
+- [x] Corregir el descarte de párrafos largos por la regla de autoría y
+  regenerar los 29 documentos españoles anteriores afectados.
+- [ ] Decidir si `32eea2e1` debe entrar al NER: su fuente es una conversación
+  de búsqueda de literatura, no un estudio primario verificable.
+- [x] Completar el NER manual del primer documento inglés sobre el `cleaned`
+  reparado: 38 bloques, 360 oraciones, 505 menciones y offsets validados;
+  guardar JSON oficial y pasar el documento a `ner` sin Anthropic.
+- [x] Auditoría humana de las 505 menciones del primer documento: la usuaria
+  confirmó que todo está correcto. El documento permanece en `ner`.
+- [x] Reparar el `cleaned` de `c13401cf-aca9-4cbb-846a-803b6b330d3a`:
+  retirar dos bibliografías, afiliaciones y material editorial; recuperar el
+  resumen y unir pasajes cortados por columnas, sin respaldo nuevo del anterior.
+- [x] Completar su NER manual sin Anthropic: 263 oraciones, 318 menciones con
+  offsets validados; JSON oficial guardado y estado `ner`.
+- [ ] Esperar la auditoría humana de las 318 menciones del segundo documento,
+  en particular las 37 marcadas `medium`. No ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` de `ce37176e-2970-4ff8-b081-d11ed61386c2`
+  desde el `converted` inglés: retirar bibliografía, material editorial y una
+  respuesta de Anthropic; conservar resumen, tablas y notas sustantivas.
+- [x] Completar su NER manual sin Anthropic: 328 oraciones, 403 menciones con
+  offsets validados; JSON oficial guardado y estado local `ner`.
+- [ ] Esperar la auditoría humana del tercer documento, con atención a las 52
+  menciones marcadas `medium`. No ejecutar fuzzy matching.
+- [x] Corregir el `cleaned` inglés de `0ee3a358-0b9a-4899-8def-1471e13b98dc`:
+  retirar resumen portugués duplicado, metadatos editoriales y créditos de
+  figuras; unir ocho pasajes cortados, sin respaldo nuevo del anterior.
+- [x] Completar su NER manual con cobertura determinista de siglas: 359
+  oraciones, 631 menciones con offsets validados; JSON oficial y estado `ner`.
+- [ ] Esperar la auditoría humana del cuarto documento, incluidas las 107
+  menciones marcadas `medium`. No ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` de `1e76e99b-cfd5-4f42-846f-44490ba6ff04`
+  con cotejo del PDF: quitar material editorial y bibliografía, separar pies de
+  figura, unir oraciones cortadas y reconstruir las tablas 1 y 2 legiblemente.
+- [x] Completar su NER manual: 325 oraciones, 546 menciones con offsets
+  validados; JSON oficial guardado y documento local en `ner` sin Anthropic.
+- [ ] Esperar la auditoría humana del quinto documento, incluidas las 102
+  menciones `medium`. No ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` inglés de `17f2d625-5dda-44e8-9051-af960d4870ec`:
+  recuperar el resumen omitido, separar párrafos y reconstruir las tablas 1 y 2
+  cotejadas con el PDF, sin guardar respaldo del `cleaned` anterior.
+- [x] Completar su NER sin Anthropic: 270 oraciones, 355 menciones literales con
+  offsets validados; JSON oficial guardado y estado local `ner`.
+- [ ] Esperar la auditoría humana del sexto documento, incluidas las 16
+  menciones `medium`. No ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` inglés de `6c19caf1-09ef-443f-93d5-12f092eb6711`:
+  retirar portada, autores, índice y título duplicado; corregir nombres y OCR
+  contra el PDF, y restaurar la atribución a la lista roja de IUCN.
+- [x] Completar su NER manual sin Anthropic: 92 oraciones, 117 menciones
+  literales con offsets validados; JSON oficial y estado local `ner`.
+- [ ] Esperar la auditoría humana del séptimo documento, incluidas las 25
+  menciones `medium`. No ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` inglés de `089089a9-e93c-493a-8f85-14a1da1b4a67`:
+  retirar metadatos y bibliografía; recomponer el orden de lectura, las seis
+  tablas y los párrafos cortados cotejando el PDF. Preservar las dos cifras
+  contradictorias sobre el área media de concesiones de conservación.
+- [x] Completar su NER sin Anthropic: 354 oraciones, 945 menciones literales
+  con offsets validados; JSON oficial y estado local `ner`.
+- [ ] Esperar la auditoría humana del octavo documento, incluidas las 81
+  menciones `medium`. No ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` inglés de `5f87adae-ade1-4ff4-b880-7951c20c839b`
+  (*Amazon Assessment Report 2025*, 497 páginas): retirar portada, nueve bloques
+  extensos de bibliografía, afiliaciones y referencias residuales, y reparar
+  ligaduras OCR. Texto final: 626.325 caracteres, sin respaldo nuevo.
+- [x] Primera extracción NER asistida por reglas y revisión distribuida por
+  capítulos: 3.632 oraciones, 4.305 menciones con offsets literales validados;
+  37 apariciones de «agroforestry» cubiertas por PRAC. JSON oficial, estado
+  `ner`, cero llamadas a Anthropic.
+- [ ] Auditar humanamente el noveno documento completo, con prioridad en las
+  1.001 menciones `medium` y las 1.462 oraciones sin anotaciones. Por su tamaño,
+  la revisión realizada no fue oración por oración. No ejecutar fuzzy matching.
+- [x] Reparar los `cleaned` de cinco documentos recibidos juntos:
+  `72d1ae85`, `79a0af26`, `2c2d1176`, `0142af8f` y `13e119a1`. Se retiró
+  una respuesta de Anthropic y una sección traducida del primero, se
+  restituyeron resúmenes omitidos en el segundo y cuarto, y se recuperaron
+  tablas del suplemento. No se guardaron respaldos nuevos.
+- [x] Primera extracción NER asistida por reglas y revisión distribuida de
+  estos cinco: 701, 503, 587, 559 y 103 menciones respectivamente (2.453 en
+  total), offsets y regla Agroforestry/AFSs validados, JSON oficiales y
+  auditorías TSV; estados locales `ner`, cero llamadas a Anthropic.
+- [ ] Auditoría humana de las cinco extracciones, incluidas 17, 9, 13, 42 y 0
+  menciones `medium` respectivamente; el `.docx` es material suplementario
+  (cuestionarios y tablas de factores), no un artículo independiente. No
+  ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` inglés de `1963df4b-4dae-4165-99ea-0f78ceb54844`:
+  quitar bibliografía y material editorial, recomponer cortes de dos columnas
+  y conservar la tabla de especies; sin respaldo del anterior.
+- [x] Primera extracción NER del mismo documento sin Anthropic: 219 oraciones,
+  250 menciones literales validadas, 3 apariciones de «agroforestry» en PRAC,
+  JSON oficial, auditorías TSV y estado local `ner`.
+- [ ] Auditoría humana de ese NER, con prioridad en 5 menciones `medium` y
+  oraciones sin anotación. No ejecutar fuzzy matching.
+- [x] Reparar los `cleaned` de `52c29204`, `da3b78cd`, `1f2f0bca`,
+  `260404f5` y `32377694`: retirar bibliografía/editorial, reparar cortes y
+  conservar cuerpo y fichas útiles de la tesis; sin respaldo anterior.
+- [x] Primera extracción NER asistida por reglas específicas para esos cinco:
+  142, 284, 560, 428 y 142 menciones, respectivamente. Offsets, regla
+  Agroforestry/AFSs y unicidad de artefactos validados; JSON oficiales,
+  auditorías TSV, estados `ner`, cero llamadas a Anthropic.
+- [ ] Auditoría humana de los cinco NER, con 1, 8, 8, 5 y 3 menciones
+  `medium` respectivamente. Dar prioridad a la tesis larga y sus oraciones
+  sin anotación. No ejecutar fuzzy matching.
+- [x] Reparar el `cleaned` de `3facb6fe-5f4e-46a3-b4be-5f304a63b0bd`:
+  retirar duplicados editoriales, notas al pie, tablas OCR ilegibles y
+  bibliografía; recomponer el cuerpo del informe sin respaldo anterior.
+- [x] Primera extracción NER del informe sin Anthropic: 527 oraciones, 721
+  menciones con offsets validados, 34 apariciones de «agroforestry» en PRAC,
+  JSON oficial, auditorías TSV y estado local `ner`.
+- [ ] Auditoría humana del informe: 32 menciones `medium`, 165 oraciones sin
+  anotación y revisión editorial de «Law 12.625 / 2012» (el número coincide
+  literalmente con el PDF). No ejecutar fuzzy matching.
+- [x] Reparar los `cleaned` de `35bfba4d`, `58a33d2c`, `702adc1b`,
+  `5ce3cf43`, `600282ba` y `571e5304`: retirar índice/editorial, respuestas
+  de Anthropic y referencias; recuperar el cuerpo perdido del artículo de
+  puntos de inflexión; unir cortes y corregir OCR repetido sin respaldos.
+- [x] Primera pasada NER sin Anthropic de esos seis: 507, 383, 127, 227, 147
+  y 199 menciones, respectivamente; offsets y regla PRAC de «agroforestry»
+  validados, JSON oficiales y auditorías TSV; estados locales `ner`.
+- [ ] Auditoría humana de los seis NER, priorizando las 90, 5, 3, 23, 48 y 12
+  menciones `medium` y las 738, 142, 197, 64, 139 y 22 oraciones sin
+  anotación. El informe de Tambopata tiene 420 oraciones largas vacías y
+  requiere revisión exhaustiva. No ejecutar fuzzy matching.
+- [x] Reparar los `cleaned` de `9c6aa0f7`, `7f93c3ee`, `8b3e8649`,
+  `7824b517`, `7a5d2888` y `8d9ec319`: normalizar OCR, recuperar resumen y
+  capítulo perdidos, quitar referencias, notas y material editorial; sin
+  respaldos del texto anterior.
+- [x] Primera pasada NER sin Anthropic de esos seis: 84, 288, 50, 755, 197
+  y 210 menciones; offsets y regla PRAC de agroforestry/AFSs validados,
+  JSON oficiales, auditorías TSV y estados locales `ner`.
+- [ ] Auditoría humana de esos seis NER, priorizando el capítulo de
+  bioeconomía (`7824b517`): 208 menciones `medium`, 423 oraciones sin
+  anotación y OCR residual. Los otros cinco tienen 8, 1, 7, 5 y 12
+  menciones `medium`. Revisar posibles omisiones en los dos estudios de agua
+  y cacao; no ejecutar fuzzy matching.
+- [x] Reparar los `cleaned` de `a14ca4bd`, `a5b24931`, `c46f0d74`,
+  `ca251938`, `c2a154e1` y `c60d39ce`: cotejar fuentes, quitar créditos,
+  editorial y bibliografías; extraer el texto de las 15 diapositivas y
+  conservar cuerpo y anexos sustantivos sin respaldar el cleaned anterior.
+- [x] Primera pasada NER de estos seis sin Anthropic: 164, 70, 41, 351, 278
+  y 749 menciones, respectivamente; offsets y cobertura PRAC validados,
+  JSON oficiales, TSV de auditoría y estados locales `ner`.
+- [ ] Auditoría humana de las seis extracciones, con 42, 19, 0, 4, 31 y 13
+  menciones `medium` y 78, 146, 8, 340, 119 y 726 oraciones sin anotación.
+  Priorizar `c60d39ce` por su longitud y posibles omisiones; revisar también
+  tesis, PES y métodos acústicos. No ejecutar fuzzy matching.
+- [x] Reparar los `cleaned` de `e5b823c9`, `d4e43ea2`, `e3d7bf1a`,
+  `d724a225`, `f9d78335` y `da74aa93`: quitar editorial y listados,
+  reconstruir resúmenes y frases cortadas, y retirar índice/formularios de
+  la tesis sin respaldar el cleaned anterior.
+- [x] Primera pasada NER sin Anthropic para estos seis: 259, 435, 481, 354,
+  2.985 y 50 menciones; offsets, cobertura PRAC y unicidad validados;
+  JSON oficiales, TSV de auditoría y estados locales `ner`.
+- [ ] Auditoría humana de los seis, priorizando la tesis `f9d78335` (102
+  menciones `medium`, 1.177 oraciones vacías), el artículo histórico
+  `e5b823c9` (71 `medium`) y el estudio fisiológico `da74aa93` (470
+  oraciones vacías). Revisar siglas de sistemas en `d4e43ea2`. No ejecutar
+  fuzzy matching.
+- [x] Reparar los `cleaned` de `d755356e`, `ef62dfe2` y `e8355e39`:
+  quitar bibliografía del primero, créditos/editorial del taller y recomponer
+  frases partidas por figuras; sin respaldo del cleaned anterior.
+- [x] Primera pasada NER de los tres sin Anthropic: 340, 112 y 187
+  menciones, JSON oficiales, TSV de auditoría, offsets y PRAC validados;
+  estados locales `ner`.
+- [ ] Auditoría humana de los tres, con 42, 57 y 114 oraciones sin
+  anotación. Revisar la clasificación Agroforestry de `d755356e`, cuyo
+  contenido trata minería y no menciona literalmente agroforestry; no
+  ejecutar fuzzy matching.
+
 ## Explorador interactivo de entidades — 26 Oct 2026
 
 Decisiones: enlazar las diez categorías; importancia = recurrencia documental +
@@ -142,6 +376,27 @@ clusters son por categoría o mixtos.
 - [x] Implementar la anidación acordada LOC dentro de CHAR.
 - [ ] Resolver en fuzzy matching la unión de nombre completo con sigla cuando
   el texto establece su identidad, conservando las menciones. No hacerlo en NER.
+- [x] Inventariar en seco las 23.135 menciones NER de 48 documentos
+  Agroforestry y contrastar Wyss/agroforestería con la base fuzzy histórica:
+  libro de auditoría actualizado con 3.098 grupos propuestos, las 3.584
+  formas literales y 14.981 menciones en grupos de dos o más formas. Mantiene
+  las 17 preguntas clave del legado; sin ejecutar el endpoint.
+- [ ] Resolver con la usuaria los canónicos propuestos de Wyss Academy,
+  WA SAM Hub/WA y agroforestry/AFS/SAF, y revisar categorías erróneas antes
+  de habilitar reglas o migraciones. El endpoint actual no corrige NER.
+- [x] Ejecutar el endpoint fuzzy matching sobre los 48 Agroforestry en `ner`:
+  todos pasaron a `fuzzyMatching`, con 23.135 entidades persistidas y sin
+  discrepancias de conteo por documento. Los 67 restantes siguen en `cleaned`.
+- [ ] Auditar y resolver los 25 grupos de variantes que el endpoint dejó
+  repartidos entre varios canónicos, antes de asumir que el agrupamiento
+  propuesto en el Excel se aplicó a PostgreSQL.
+- [x] Añadir `GET /documents/{id}/entities` para auditar en Postman las
+  menciones resueltas por documento, con paginación y filtros; verificado
+  contra la API y PostgreSQL sin construir la red.
+- [x] Corregir las categorías confirmadas en el legado: `WA SAM Hub` LOC→CHAR
+  (1 mención), `agroforestry systems` LOC→PRAC (4 menciones), retirar
+  `Wyss Academy` LOC huérfano y los canónicos incorrectos sin referencias;
+  sincronizar JSON de NER, PostgreSQL, prompt, codebook y libro de auditoría.
 - [ ] Definir una nueva proyección analítica del esquema de diez categorías
   antes de sustituir la selección histórica `prac-infra-rul-v2`. Reclasificar
   INFRA histórico según su contexto, sin convertirlo automáticamente.
