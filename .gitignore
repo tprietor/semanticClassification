@@ -17,6 +17,7 @@ s3/
 
 # Data outputs (generated)
 data/output/
+outputs/
 data/processed/entities/*.json
 data/processed/entities/*.csv
 
