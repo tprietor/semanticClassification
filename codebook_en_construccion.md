@@ -111,7 +111,7 @@ Utiliza las etiquetas exactamente como aparecen en la tabla, respetando mayúscu
 | SKILL | Habilidades |
 | PRAC | Prácticas |
 | physical_INFRA | Infraestructura física |
-| soft_INFRA | Infraestructura de soporte |
+| soft_INFRA | Infraestructura blanda |
 | eco_INFRA | Infraestructura ecológica |
 | RUL | Reglas |
 | LOC | Lugares |
@@ -276,7 +276,7 @@ Estos tipos son referencias descriptivas dentro de KNOW; no constituyen nuevos c
 
 **Ejemplo de anotación:** En «El puente permite el acceso al territorio», extrae «puente» como physical_INFRA.
 
-### 5.7. soft_INFRA — Infraestructura de soporte
+### 5.7. soft_INFRA — Infraestructura blanda
 
 **Definición:** Sistemas, instalaciones y recursos organizados que sostienen la producción, el aprendizaje, el monitoreo o la gestión de información en el territorio.
 

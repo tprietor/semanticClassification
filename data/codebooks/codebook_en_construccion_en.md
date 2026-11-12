@@ -1,6 +1,6 @@
 # Codebook for Semantic Entity Extraction and Labeling
 
-**Status:** Operational draft for review; pilot not yet approved.
+**Status:** Operational draft for review and empirical validation; this revision has not been tested against an adjudicated sample.
 
 Extract literal mentions and classify them into the 10 categories in this codebook. Use the instructions and the text provided; do not consult external documents or add information from external knowledge. Applying the codebook to the corpus requires the pilot review described in section 10.
 
@@ -83,10 +83,14 @@ When the function cannot be determined using the permitted context, apply the am
 - Meaning of entity or mention in this task: a word or short span of text that identifies a component of the territory classifiable into one of the 10 categories.
 - Unit receiving a label: a continuous, literal span that is sufficiently complete to identify what is mentioned and is contained within one sentence.
 - Permitted context for interpreting a mention: the sentence containing the mention and the other sentences in the chunk received by the model. The source sentence is saved as context.
-- Required textual evidence and permitted inferences: every annotation must be supported by the text. Do not add entities or attributes using external knowledge.
+- Required textual evidence and permitted inferences: interpret what the supplied text expresses, including indirect formulations and evidence outside the selected span but within the permitted context. Do not add entities, holders, functions, or attributes from external knowledge or mere plausibility. An indicative word is neither a required token nor an automatic label trigger.
 - Handling repeated mentions: record each occurrence as an independent mention, with its position and context (section 6.2). Subsequent linking to the same canonical node preserves this evidence.
 - Distinction between a literal mention and a canonical entity: extraction preserves the literal text of the selected span; normalization and linking to canonical entities belong to the subsequent fuzzy matching task.
 - Scope of this stage: NER extracts and classifies mentions. Relationship construction and its co-occurrence rules are defined in the network task.
+
+**Four distinct objects:** A *mention* is the literal span; its *context* supplies evidence for interpreting that span; its *category* identifies the component or function expressed in that context; a *canonical entity* is a later grouping of mentions. The span need not contain every word that justifies its label, but must identify what is mentioned without swallowing the explanatory sentence. Canonicalization cannot repair an unsupported classification or replace the original evidence.
+
+**Consistency across mentions:** Compare concept, sense, and contextual evidence, not spelling alone. Different expressions of the same concept with equivalent functions and evidence should have the same label; divergent labels in that case are an extractor inconsistency. The same expression can legitimately receive different labels when it identifies different concepts or functions in different contexts. Record the contextual reason during review rather than assigning a fixed category to a string.
 
 ## 4. Label System
 
@@ -135,6 +139,8 @@ Classify each mention by applying:
 - Include affected actors even when they do not perform an action.
 - Include actors whose participation in an activity is negated; preserve that negation in context without asserting participation.
 
+**Institutional names:** “Wyss Academy” and “WA SAM Hub” designate organizations. When these are the complete mention, classify them as CHAR, including in sentences about their area of engagement. Do not classify the organization's name as LOC merely because a place is mentioned nearby. Short acronyms such as “WA” still require context to resolve their referent.
+
 **Exclusion criterion:** An expression that only locates a process or event, without identifying the collective as an actor in context, does not receive CHAR. In “The workshop took place in the community of San Pedro,” record only “San Pedro” as LOC.
 
 **Required evidence:** The designation and its context must identify the actor and its territorial role. Neither a proper name nor the performance of an action is required. Use the context permitted in section 3.
@@ -156,38 +162,21 @@ The examples illustrate classification characteristics; the rules on pronouns, a
 
 ### 5.2. KNOW — Knowledge
 
-**Definition:** Technical, ecological, or traditional knowledge about the territory, its ecosystems, and their management.
+**Semantic definition and referent:** A specific understanding about territorial ecosystems, species, cycles, uses, methods, techniques, or management, presented by the text as something held, learned, transmitted, recorded, consulted, or used to inform judgment. It may be technical, ecological, local, Indigenous, or traditional; these are descriptive types, not new labels. Labeling does not certify that the stated content is true.
 
-- **Technical knowledge:** Knowledge about techniques, methods, tools, or procedures, such as knowledge of soil management or agroforestry systems.
-- **Ecological knowledge:** Knowledge about ecosystems, species, cycles, and ecological relationships, such as knowledge of Brazil nut flowering.
-- **Traditional knowledge:** Local or Indigenous knowledge that is preserved or transmitted, such as knowledge of plant uses or traditional forest management.
+**Sufficient evidence and inclusion:** The supplied sentence or permitted chunk context must frame an identifiable content as understanding. Direct attribution is one route, but not a requirement: teaching a seasonal relation, recording it in a community calendar, or drawing on an observed pattern for a decision can also provide that framing. No word such as “knowledge,” “know,” or “saber” is required. A holder need not be named; do not invent one. The framing may sit outside the extracted span.
 
-These types are descriptive references within KNOW; they are not new category codes.
+**Exclusion and boundaries:** An informative statement, territorial description, isolated technical term, practice, or skill is not KNOW just because a reader could learn from it. The text must present a distinct content as understood or used as understanding. KNOW is *what is understood*; SKILL is an actor's competence to do a task; PRAC is the activity; ATT is an attributed evaluation, identity, or commitment. Do not infer KNOW from performing a task, or infer SKILL or ATT from KNOW. If no framing can be found in permitted context, omit the proposed KNOW span; if framing exists but an alternative reading remains plausible, use section 7.
 
-**Inclusion criterion:** The text must identify knowledge or knowledge content. It may do so through an explicit designation, such as “traditional knowledge of forest management,” or through an expression attributing knowledge, such as “the producers know the Brazil nut flowering cycles.” Extract “Brazil nut flowering cycles” as KNOW and “producers” as CHAR.
+**Span:** Extract the shortest complete literal expression of the content, retaining a necessary relation or object. Leave separable attribution or explanation in context. A single topic word can be too short to identify the content.
 
-**Knowledge holder:** Explicit mentions of knowledge are allowed even when the text does not identify who holds it. This does not authorize attributing a holder that the text does not identify.
-
-**Handling general statements:** Assign KNOW only when the text identifies the content as knowledge or attributes knowledge. An informative statement or a description of the territory is not sufficient on its own to assign KNOW. Identifying the knowledge holder is not required.
-
-**Evidence and exclusions:** The presence of a practice, skill, or technical term alone does not show that the text is describing knowledge. Performing an activity does not automatically justify adding a KNOW annotation. A statement about the territory must be assessed in context to determine whether it presents knowledge content according to this definition.
-
-**Distinction:** KNOW identifies knowledge or known content; SKILL identifies competence to perform a task; PRAC identifies the activity.
-
-**Boundary with ATT:** Evaluations, identities, and commitments are assessed under ATT. Each category requires its own evidence.
-
-**Examples distinguishing KNOW, SKILL, and PRAC:**
-
-| Text | Illustrative interpretation |
-|---|---|
-| The women producers know the Brazil nut flowering cycles. | KNOW: expresses ecological knowledge. |
-| The women producers know how to use monitoring equipment. | SKILL: expresses operational competence. |
-| The women producers monitor Brazil nut flowering. | PRAC: expresses an activity. |
-
-- Exclusions: an isolated activity, skill, or technical term is not sufficient to assign KNOW.
-- Boundary with ATT: KNOW identifies knowledge or known content; ATT identifies evaluations, perceptions, identities, and commitments.
-- General statements: a description of the territory does not automatically receive KNOW. The text must present it as knowledge or knowledge content.
-- Span: extract the content of the knowledge, preserving in context the expression that identifies it as such.
+| Illustrative sentence | Literal fragment | Decision and reason |
+|---|---|---|
+| “Elders teach that Brazil nut flowering follows the first rains.” | “Brazil nut flowering follows the first rains” | KNOW: a specific ecological relationship is transmitted, without a lexical knowledge marker. |
+| “The seasonal calendar records when Brazil nut trees flower.” | “when Brazil nut trees flower” | KNOW: the calendar records seasonal understanding. |
+| “Brazil nut flowering follows the first rains.” | “Brazil nut flowering follows the first rains” | Omit as KNOW when this is all the permitted context supplies: it is a bare description. |
+| “The report mentions traditional knowledge but gives no topic or content.” | “traditional knowledge” | Do not force a content-specific KNOW annotation: the indicator supplies no identifiable content; generic mentions are a pending scope decision in section 10. |
+| “The women producers can operate monitoring equipment after training.” | “can operate monitoring equipment” | SKILL, not KNOW: competence to perform a task is attributed. |
 
 ### 5.3. ATT — Attitudes and Values
 
@@ -206,6 +195,8 @@ These types are descriptive references within KNOW; they are not new category co
 **Distinction:** Evaluating or perceiving corresponds to ATT; knowing corresponds to KNOW; acting corresponds to PRAC. Do not infer an attitude solely because someone performs an activity.
 
 **Annotation example:** In “The women producers express their commitment to forest conservation,” extract “commitment to forest conservation” as ATT and “women producers” as CHAR.
+
+**Negative and boundary examples (illustrative):** In “The producers planted trees,” “planted trees” is PRAC, not evidence of ATT. In “The producers value the forest as part of their identity,” “value the forest as part of their identity” is ATT: the actor's evaluation is expressed, not inferred from an activity.
 
 ### 5.4. SKILL — Skills
 
@@ -227,11 +218,17 @@ These types are descriptive references within KNOW; they are not new category co
 
 **Annotation example:** In “The women producers have the ability to operate monitoring equipment,” extract “ability to operate monitoring equipment” as SKILL and “women producers” as CHAR.
 
+**Negative and boundary examples (illustrative):** In “The permit says the monitors can enter the reserve,” “can enter the reserve” expresses permission, not SKILL. In “After training, the monitors can calibrate the sensors independently,” “can calibrate the sensors independently” is SKILL because training and independent operation support competence.
+
 ### 5.5. PRAC — Practices
 
 **Definition:** Activities, routines, or processes that the text identifies for producing, using, conserving, restoring, monitoring, marketing, or managing components of the territory.
 
 **Activities covered:** Agroforestry, monitoring, marketing, restoration, and governance as an activity or process.
+
+**Fixed classification for agroforestry terms:** The standalone mentions “agroforestry,” “agroforestería”/“agroforesteria,” and “AFSs” identify the agroforestry practice or system and always receive PRAC, regardless of capitalization. Do not assign these standalone mentions to CHAR, LOC, or another category. When one of these words is part of a longer expression naming another component, classify the complete expression by its referent instead: “agroforestry farmers” is CHAR, with no separate overlapping PRAC annotation for “agroforestry.” Apply the same boundary rule to analogous complete designations.
+
+The complete mention “agroforestry systems” also receives PRAC. It names the productive practice or system, even when the surrounding sentence discusses a study area. Do not classify this exact mention as LOC.
 
 **Inclusion and evidence:** Assign PRAC when the text names an activity or describes a specific action relevant to the territory. It may be expressed as a noun or a verb phrase. Identifying the actor is not required when the activity is explicit.
 
@@ -249,6 +246,7 @@ These types are descriptive references within KNOW; they are not new category co
 
 - In “Community monitoring activities are carried out,” extract “Community monitoring” as PRAC. The modifier “Community” does not, on its own, name an actor and is not sufficient to add CHAR.
 - In “Forest restoration is proposed,” extract “Forest restoration” as PRAC; preserve the proposal in context without asserting its implementation.
+- In “Pruning residues were used as mulch,” do not classify “Pruning residues” as PRAC: they are materials, and the sentence does not assert pruning. “used as mulch” may identify an activity if the territorial context supports it.
 
 ### 5.6. physical_INFRA — Physical Infrastructure
 
@@ -269,6 +267,8 @@ These types are descriptive references within KNOW; they are not new category co
 **Monitoring equipment:** If the text presents it as an organized resource for monitoring, assess it as soft_INFRA. If it describes a structure for technological connectivity, assess it as physical_INFRA. The word “equipment” alone does not resolve the category.
 
 **Annotation example:** In “The bridge provides access to the territory,” extract “bridge” as physical_INFRA.
+
+**Negative and boundary examples (illustrative):** In “The team installed a monitoring station for water sampling,” “monitoring station” is soft_INFRA by its organized monitoring function despite being built. In “The project purchased equipment,” “equipment” alone lacks the function needed for physical_INFRA.
 
 ### 5.7. soft_INFRA — Support Infrastructure
 
@@ -291,6 +291,8 @@ These types are descriptive references within KNOW; they are not new category co
 **Boundary with eco_INFRA:** Primary forest and corridors are assessed as eco_INFRA when they perform ecological functions. The function described in context determines the classification.
 
 **Annotation example:** In “The seed bank preserves material for plant production,” extract “seed bank” as soft_INFRA.
+
+**Negative and boundary example (illustrative):** In “The communities agreed to share monitoring records,” do not assign soft_INFRA to “monitoring records” or infer a platform; no organized support is identified. Assess the agreement or activity separately if its own criteria are met.
 
 ### 5.8. eco_INFRA — Ecological Infrastructure
 
@@ -335,6 +337,8 @@ This criterion classifies the mention of the plan as an instrument. Its prescrip
 
 **Annotation example:** In “The forest management plan establishes responsibilities,” extract “forest management plan” as RUL.
 
+**Negative and boundary examples (illustrative):** In “The team plans to monitor the forest,” “plans to monitor the forest” is an intention, not RUL; the identifiable future monitoring may be PRAC. In “The agreement prohibits logging near the spring,” “agreement” is RUL because its prohibition supplies regulatory function. Neither the word “plan” nor “agreement” alone settles the category.
+
 ### 5.10. LOC — Places
 
 **Definition:** Geographic, territorial, administrative, or ecological spaces or units that the text identifies through their location, extent, or boundaries.
@@ -363,7 +367,9 @@ This criterion classifies the mention of the plan as an instrument. Its prescrip
 - **Acronyms and abbreviations:** extract the explicit form when its context supports a category. If the full name and acronym appear, record both separately. Do not invent expansions or resolve identities.
 - **Enumerations:** record each explicit designation separately in any category. Where words are omitted or modifiers are shared, preserve only continuous spans identifiable in context. Do not copy a modifier to another position or reconstruct complete designations.
 - **References:** do not annotate pronouns or empty references such as “this” or “there,” or replace them with their antecedents. Generic designations are allowed if they meet their category criteria.
+- **Stopwords and discourse words:** do not annotate isolated function words or discourse markers as entities, regardless of category or ambiguity level. Pronouns, determiners, conjunctions, prepositions, and adverbs such as “misma,” “así,” “además,” and “también” do not independently identify a territorial component. Include such words only when they are necessary parts of a longer, otherwise valid literal mention or proper name. If removing them leaves no identifiable referent or category-specific content, omit the candidate annotation.
 - **One category per occurrence:** choose the function best supported by the context, using the category boundaries in the category descriptions and section 7. The same word may receive different categories in different occurrences.
+- **No lexical shortcuts:** except for the fixed agroforestry-term rule in section 5.5, category titles and indicative words are clues, never mandatory vocabulary or sufficient triggers. Decide from the referent and function expressed in context. Neither a bare informative assertion automatically becomes KNOW nor an explicit knowledge word automatically supplies identifiable knowledge content.
 - **Nesting and overlaps:** allow only LOC strictly contained within CHAR, with evidence for both (section 6.1). Do not generate other nested spans, partial overlaps, or discontinuous spans. Preserve the minimal complete expression of the main component; its internal words do not constitute additional annotations. For example, within ATT “commitment to forest conservation,” do not add an internal PRAC “forest conservation.”
 - **Negation and temporality:** an explicit mention may be preserved even when it is negated, absent, proposed, hypothetical, future, or obligatory, provided it meets the category criteria. The annotation does not assert existence, possession, or implementation. Preserve that status in context; include negation in the span when it is part of a RUL prescription. Do not add polarity or time fields or infer KNOW, ATT, or SKILL from an activity or intention.
 - **Repetitions:** record each occurrence with its position and context, including within the same sentence (section 6.2).
@@ -475,6 +481,8 @@ If there are no valid mentions, return `annotations: []`. Do not add explanation
 
 The code renames `label` to `category`, locates each literal occurrence, and adds `start`, `end` (exclusive), and `context` (source sentence), retaining `sentence_id`, `text`, and `ambiguity`. Positions are Python character indices into the clean text: `texto[start:end] == text`. The NER JSON stores `document_id` and `entities`; it does not yet create canonical nodes.
 
+**Audit limitation:** The model can interpret a mention using other sentences in its chunk, but the service stores only the mention's source sentence as `context`. The decisive cross-sentence evidence is therefore not attached to that mention for later review. The four-field output also cannot store an alternative label, rationale, negation, or temporal status. These are technical gaps for a later task, not capabilities implemented by this codebook. Preserve the full input chunk separately during a pilot when reviewing context-dependent decisions.
+
 The service checks the fields, document identifier, labels, sentences, literal wording, ambiguity, and overlaps. If a response loses annotations because of these errors, it asks the model for up to two corrections of the chunk, identifying the conflicting spans. If the errors persist, it fails without saving a partial result; it also fails on truncation or absence of the required tool. Used in isolation, the parser retains its tolerant mode for compatibility, but NER requires a valid response before accepting the chunk. A structurally valid output still requires semantic review.
 
 ## 9. Complete Application Examples
@@ -492,13 +500,30 @@ The following limited cases show all expected annotations; copy the input `sente
 | mining and mining. | Two PRAC annotations: “mining”, `low`, at distinct positions. |
 | Thank you for your attention. | `annotations: []`. |
 
-In a factual sentence such as “Flowering occurs in August,” do not add KNOW without identifying knowledge or attributing it. An acronym without a recognizable function does not automatically receive CHAR either. Actual uncertainties from the pilot are reviewed using section 7; do not invent a case of high ambiguity to replace that review.
+Further **invented illustrative contrasts** give the candidate literal span, decision, and reason. They are not corpus observations or validation results. “Omit” refers to the candidate span only; another independently supported mention in the sentence may qualify.
+
+| Sentence | Literal fragment | Decision and brief reason |
+|---|---|---|
+| “Rangers track changes in forest cover each month.” | “track changes in forest cover” | PRAC: recurring monitoring activity. |
+| “Monthly forest-cover monitoring is carried out by rangers.” | “Monthly forest-cover monitoring” | PRAC: same activity and sense in different words; its label should stay consistent. |
+| “Elders teach the season when river fish migrate.” | “the season when river fish migrate” | KNOW: transmitted seasonal understanding without a knowledge indicator. |
+| “The community calendar records the river fish migration season.” | “the river fish migration season” | KNOW: equivalent type of recorded understanding, expressed differently. |
+| “The team has access to knowledge materials.” | “knowledge materials” | Omit as KNOW: the indicator and access do not identify knowledge content. |
+| “The forest shelters pollinators needed for regeneration.” | “forest” | eco_INFRA: ecological function is stated. |
+| “The survey was conducted in the forest.” | “forest” | LOC: identical expression, but spatial function; the label change is legitimate. |
+| “A monitoring system stores observations.” | “monitoring system” | soft_INFRA: organized support for information management. |
+| “Monitoring of water quality is planned.” | “Monitoring of water quality” | PRAC: proposed activity, not an installed system or executed event. |
+| “The plan was discussed.” | “plan” | Omit as RUL if permitted context gives no regulatory function; do not force a category. |
+
+A bare informative sentence such as “Flowering occurs in August” is not automatically KNOW. An acronym without a recognizable referent or function does not automatically receive CHAR. Review actual uncertainties with section 7; these illustrations do not stand in for a pilot.
 
 ## 10. Validation and Maintenance
 
+**Scope of this revision:** The stronger separation of mention, context, and category; non-lexical KNOW evidence; and the cross-mention consistency test clarify the existing ten-category framework. Requiring identifiable knowledge content makes a generic, content-free phrase such as “traditional knowledge” a possible substantive narrowing relative to older readings. Whether to annotate such generic mentions remains a **theoretical decision pending researcher adjudication**; do not silently treat this illustration as an approved change in inclusion. Likewise, no project decision establishes how much merely implied ecological or regulatory function suffices for eco_INFRA or RUL. Use the stated evidence rules conservatively and record borderline cases for review rather than inventing a threshold.
+
 1. Select a real document of manageable length and preserve its complete clean text, identifier, and SHA-256 hash. Run only NER with the current versions; preserve results and warnings for review.
 2. Check labels, literal wording, positions, sentences, repetitions, and nesting. Compare the final annotations received with those retained: they must match. Also preserve the previous corrected responses and the number of retries. Review empty chunks.
-3. Read all pilot sentences, including those without mentions, to detect omissions, incorrect assignments, and overly broad spans. Pay particular attention to KNOW/ATT/SKILL/PRAC, infrastructure/LOC, proposed rules, acronyms, and `medium` or `high` mentions.
+3. Read all pilot sentences, including those without mentions, to detect omissions, incorrect category assignments, and overly broad or truncated spans. Compare equivalent mentions for consistent labels and distinguish documented sense changes from inconsistent classification. Pay particular attention to KNOW/ATT/SKILL/PRAC, infrastructure/LOC, proposed rules, acronyms, and `medium` or `high` mentions.
 4. Record corrections and their rationale; human review adjudicates the reference set. Separate these development data from a subsequent evaluation using different documents, and keep the examples within the codebook identified as illustrative. A single document does not validate absent categories or demonstrate quality across all languages.
 5. Before processing the corpus, require zero unresolved structural errors and review all disagreements detected in the pilot. Do not claim measured precision or recall without an adjudicated reference set. Once one exists, calculate precision, recall, and F1 using exact matches of position and category, together with errors by category; set the thresholds for expanded evaluation before measuring performance on held-out documents.
 6. If a rule changes as a result of the pilot, update the codebook and its affected examples. Update the prompt template or contract checks when required, run the regression checks, and repeat only the affected validation. Compare annotations across versions before processing batches. Evaluate LLM repeatability on fixed text; tests with a simulated provider verify the code, not its stability.
