@@ -71,6 +71,7 @@ def _filters(selection: ExplorerFiltersRequest, top_n: int | None) -> ExplorerFi
                 {str(entity_id) for entity_id in selection.excluded_entity_ids or []}
             )
         ),
+        excluded_entity_names=tuple(selection.excluded_entity_names),
     )
 
 

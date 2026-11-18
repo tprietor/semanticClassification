@@ -3,7 +3,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from src.analysis.explorer import PERIODS_BY_ID
+from src.analysis.explorer import (
+    DEFAULT_EXCLUDED_ENTITY_NAMES,
+    PERIODS_BY_ID,
+    normalize_entity_name,
+)
 from src.api.schemas.network import EdgeWeighting, IncubatorFilter
 from src.categories import STORED_CATEGORIES
 
@@ -108,6 +112,24 @@ class ExplorerFiltersRequest(BaseModel):
             "del resto se calculan sin ellas"
         ),
     )
+    excluded_entity_names: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        default_factory=lambda: list(DEFAULT_EXCLUDED_ENTITY_NAMES),
+        max_length=500,
+        description=(
+            "Nombres canónicos completos a excluir en cualquier categoría, sin "
+            "distinguir mayúsculas ni espacios extra. Por defecto excluye Madre de "
+            "Dios y Agroforestry; [] desactiva la exclusión por nombre. La lista "
+            "enviada reemplaza los valores predeterminados"
+        ),
+    )
+
+    @field_validator("excluded_entity_names")
+    @classmethod
+    def normalize_excluded_names(cls, values: list[str]) -> list[str]:
+        names = {normalize_entity_name(value) for value in values}
+        if "" in names:
+            raise ValueError("Los nombres a excluir no pueden estar vacíos")
+        return sorted(names)
 
 
 class ExplorerNetworkRequest(ExplorerScopeRequest, ExplorerFiltersRequest):
@@ -244,6 +266,9 @@ class ExplorerFiltersSummary(BaseModel):
     ranking_metric: RankingMetric
     top_n: int | None
     excluded_entity_ids: list[str] | None = None
+    excluded_entity_names: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_EXCLUDED_ENTITY_NAMES)
+    )
 
 
 class ExplorerExcludedEntity(BaseModel):

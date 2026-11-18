@@ -287,6 +287,69 @@ class ExplorerNetworkTests(unittest.TestCase):
             replace(base, excluded_entity_ids=("coop",)).structural(),
             base.structural(),
         )
+        self.assertNotEqual(
+            replace(base, excluded_entity_names=()).structural(),
+            base.structural(),
+        )
+
+    def test_default_name_exclusions_match_all_ids_before_building_metrics(self) -> None:
+        with patch.dict(
+            ENTITIES,
+            {
+                "madre": ("Madre de Dios", "LOC"),
+                "madre_other": (" MADRE  DE DIOS ", "CHAR"),
+                "agro": ("Agroforestry", "PRAC"),
+                "agro_other": ("AGROFORESTRY", "LOC"),
+                "systems": ("Agroforestry systems", "PRAC"),
+            },
+        ):
+            mentions = _sentences(
+                (DOC_A, "s1", ("coop", "madre", "agro", "systems", "rio")),
+                (DOC_B, "s1", ("coop", "madre_other", "agro_other", "systems", "rio")),
+            )
+        filters = ExplorerFilters(minimum_node_document_count=1, top_n=None)
+        network = build_explorer_network(mentions, filters)
+        expected = build_explorer_network(
+            mentions,
+            replace(
+                filters,
+                excluded_entity_names=(),
+                excluded_entity_ids=("agro", "agro_other", "madre", "madre_other"),
+            ),
+        )
+
+        self.assertEqual(network, expected)
+        self.assertEqual(_node_ids(network), {"coop", "systems", "rio"})
+        self.assertEqual(network["stages"]["mentions"], len(mentions) - 4)
+        self.assertEqual(
+            {entity["id"] for entity in network["excluded_entities"]},
+            {"agro", "agro_other", "madre", "madre_other"},
+        )
+        restored = build_explorer_network(
+            mentions, replace(filters, excluded_entity_names=())
+        )
+        self.assertEqual(len(_node_ids(restored)), 7)
+
+    def test_name_exclusions_combine_with_ids_and_report_each_entity_once(self) -> None:
+        network = build_explorer_network(
+            CORPUS,
+            ExplorerFilters(
+                minimum_node_document_count=1,
+                top_n=None,
+                excluded_entity_ids=("coop", "fantasma"),
+                excluded_entity_names=(" COOPERATIVA ", "Podas"),
+            ),
+        )
+
+        self.assertFalse({"coop", "podas"} & _node_ids(network))
+        self.assertEqual(
+            [entity["id"] for entity in network["excluded_entities"]],
+            ["coop", "fantasma", "podas"],
+        )
+        self.assertEqual(
+            network["excluded_entities"][0]["mention_count"],
+            sum(mention.canonical_id == "coop" for mention in CORPUS),
+        )
 
     def test_empty_results_return_warnings_instead_of_errors(self) -> None:
         no_mentions = build_explorer_network([], ExplorerFilters())
@@ -960,6 +1023,31 @@ class ExplorerApiTests(unittest.TestCase):
         self.assertEqual(_filters(ExplorerNetworkRequest(), 10).excluded_entity_ids, ())
         with self.assertRaises(ValidationError):
             ExplorerNetworkRequest(excluded_entity_ids=["MADRE DE DIOS"])
+
+    def test_excluded_entity_names_defaults_normalization_and_override(self) -> None:
+        default_names = ("agroforestry", "madre de dios")
+        self.assertEqual(
+            _filters(ExplorerNetworkRequest(), 10).excluded_entity_names, default_names
+        )
+        self.assertEqual(
+            _filters(ExplorerCompareRequest(), None).excluded_entity_names, default_names
+        )
+        request = ExplorerNetworkRequest(
+            excluded_entity_names=[" Madre  de Dios ", "AGROFORESTRY", "agroforestry"]
+        )
+        self.assertEqual(_filters(request, 10).excluded_entity_names, default_names)
+        self.assertEqual(
+            _filters(ExplorerNetworkRequest(excluded_entity_names=[]), 10).excluded_entity_names,
+            (),
+        )
+        self.assertEqual(
+            _filters(ExplorerNetworkRequest(excluded_entity_names=["Podas"]), 10).excluded_entity_names,
+            ("podas",),
+        )
+        for invalid in (["  "], [""], ["x" * 201], ["x"] * 501, None):
+            with self.subTest(invalid=repr(invalid)[:30]):
+                with self.assertRaises(ValidationError):
+                    ExplorerNetworkRequest(excluded_entity_names=invalid)
 
     def test_load_db_mentions_with_empty_document_list_returns_nothing(self) -> None:
         db = Mock()

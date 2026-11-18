@@ -1,5 +1,20 @@
 # Tareas
 
+## Continuidad del filtro de nodos — 18 Nov 2026
+
+- [x] Implementar y probar la exclusión por nombre en el explorador, con
+  `Madre de Dios` y `Agroforestry` como valores predeterminados. El contrato
+  vigente, archivos y validación están en `PROJECT_CONTEXT.md`, en el punto
+  de continuidad actualizado el 18 Nov.
+- [x] Guardar el estado local para apagar el equipo, sin commit, push o despliegue.
+- [x] Al retomar el 18 Nov, comprobar `git status` y HEAD antes de editar;
+  conservar los cambios locales del filtro y distinguir los nueve commits anteriores.
+- [x] Repetir las pruebas del explorador: 53 pruebas y 578 subpruebas exitosas.
+- [x] Registrar el filtro y su contexto en el mismo commit, autorizado el 18 Nov.
+- [ ] Push y despliegue requieren autorización para este cambio;
+  no se han realizado. Después del despliegue, verificar en la API real que
+  los nombres exactos se excluyen de nodos y aristas y se reportan como excluidos.
+
 ## Limpieza y traducción de la Guía del EUDR — 11 Nov 2026
 
 - [x] Revisar `b4ac3608-c2c2-46ca-8877-564fa4775362` contra convertido y PDF:

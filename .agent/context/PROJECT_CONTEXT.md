@@ -14,6 +14,39 @@ El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### Continuidad del filtro del explorador — 18 Nov 2026
+
+La tarea más reciente es ocultar del explorador los nodos con nombre canónico
+exacto `Madre de Dios` o `Agroforestry`, en cualquier categoría. El cambio está
+guardado localmente: `excluded_entity_names` usa ambos nombres por defecto,
+ignora mayúsculas y espacios sobrantes y se combina con `excluded_entity_ids`.
+Se aplica antes de construir la red y calcular métricas en `/network` y
+`/compare`, con exclusiones incluidas en la clave de caché y en la respuesta.
+La coincidencia es exacta: `Agroforestry systems` y `río Madre de Dios` siguen
+visibles. Una lista explícita reemplaza los valores predeterminados y `[]`
+desactiva el filtro por nombre. No se modificó el corpus.
+
+Los cambios del filtro están en `src/analysis/explorer.py`, los schemas y router
+de explorer, `src/services/explorer.py`, `tests/test_explorer.py` y la sección
+del explorador en `architecture.md`. El 18 Nov se repitieron las **53 pruebas
+y 578 subpruebas**, todas exitosas, con dos advertencias de dependencias,
+y se verificó `git diff --check`.
+Comando usado:
+`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/semantic-commit-deps MPLCONFIGDIR=/private/tmp/semantic-commit-matplotlib .venv/bin/python -m pytest tests/test_explorer.py -q -p no:cacheprovider`.
+Las dependencias auxiliares se instalaron en `/private/tmp`; esa carpeta puede
+desaparecer al reiniciar. No se alteró el entorno virtual del proyecto.
+
+Rama verificada antes del commit: `feat/explorador-entidades`, HEAD `a1c346e`;
+nueve commits locales por delante de `origin/feat/explorador-entidades`.
+Esos nueve commits recogen los cambios anteriores del proyecto y
+pasaron la suite completa: **193 pruebas y 586 subpruebas**. Inventario:
+`export/commit_review_2026-11-11/created_commits.json`.
+El 13 Nov se guardó el punto para apagar el equipo sin commit. El 18 Nov la
+usuaria autorizó el commit del filtro y su documentación; ambos se incluyen
+en el mismo commit. **El push y el despliegue siguen pendientes** y el dashboard
+en AWS todavía no incorpora este filtro. Los siguientes pasos se registran en
+`tasks.md`, bajo «Continuidad del filtro de nodos».
+
 ### Limpieza de la Guía del EUDR — 11 Nov 2026
 
 **Continuidad de traducción:** después de la limpieza, la usuaria pidió completar

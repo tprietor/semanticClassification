@@ -42,6 +42,13 @@ from src.analysis.cooccurrence import (
 from src.categories import ACTIVE_CATEGORIES, LEGACY_CATEGORIES
 
 EXPLORER_VERSION = "entity-explorer-v1"
+DEFAULT_EXCLUDED_ENTITY_NAMES = ("agroforestry", "madre de dios")
+
+
+def normalize_entity_name(value: str) -> str:
+    """Compara nombres completos sin distinguir mayúsculas ni espacios extra."""
+
+    return " ".join(value.split()).casefold()
 
 LinkMode = Literal["any", "between", "within", "pairs"]
 RankingMetric = Literal[
@@ -102,6 +109,7 @@ class ExplorerFilters:
     # Entidades canónicas que se quitan antes de construir la red (por ejemplo, la
     # región que da contexto a todo el corpus); ordenadas para la clave de caché.
     excluded_entity_ids: tuple[str, ...] = ()
+    excluded_entity_names: tuple[str, ...] = DEFAULT_EXCLUDED_ENTITY_NAMES
 
     def structural(self) -> "ExplorerFilters":
         """Los mismos filtros sin lo que solo afecta la selección final.
@@ -302,6 +310,7 @@ def rank_nodes(
 def exclude_entities(
     mentions: Sequence[MentionRecord],
     excluded_ids: Sequence[str],
+    excluded_names: Sequence[str] = (),
 ) -> tuple[list[MentionRecord], tuple[dict[str, Any], ...]]:
     """Quita las menciones de las entidades excluidas y describe cada una.
 
@@ -309,9 +318,15 @@ def exclude_entities(
     que la interfaz pueda mostrarla y permitir quitarla del filtro.
     """
 
-    if not excluded_ids:
+    if not excluded_ids and not excluded_names:
         return list(mentions), ()
     wanted = set(excluded_ids)
+    names = {normalize_entity_name(name) for name in excluded_names}
+    wanted.update(
+        mention.canonical_id
+        for mention in mentions
+        if normalize_entity_name(mention.canonical_name) in names
+    )
     kept: list[MentionRecord] = []
     found: dict[str, dict[str, Any]] = {}
     for mention in mentions:
@@ -353,7 +368,9 @@ def build_ranked_network(
     modifica después de construirlo, así que puede reutilizarse.
     """
 
-    mentions, excluded = exclude_entities(mentions, filters.excluded_entity_ids)
+    mentions, excluded = exclude_entities(
+        mentions, filters.excluded_entity_ids, filters.excluded_entity_names
+    )
     categories = resolve_categories(filters.categories, mentions)
     pairs = resolve_category_pairs(
         categories, filters.link_mode, filters.category_pairs

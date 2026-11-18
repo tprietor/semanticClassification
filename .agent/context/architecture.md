@@ -442,6 +442,14 @@ POST /analysis/explorer/v1/network
   ellas. La respuesta trae `excluded_entities` con nombre, categoría y menciones
   quitadas (nombre nulo si la entidad no está en el alcance). Es parte de la clave de
   la caché.
+- `excluded_entity_names` excluye nombres canónicos completos en cualquier categoría,
+  sin distinguir mayúsculas ni espacios sobrantes. Por defecto contiene
+  `agroforestry` y `madre de dios`; `[]` desactiva esta exclusión y una lista explícita
+  reemplaza esos valores. No coincide por fragmentos: `Agroforestry systems` y
+  `río Madre de Dios` se conservan. Se aplica junto a los IDs antes de construir
+  `/network` y `/compare`, recalcula métricas y forma parte de la clave de caché.
+  `excluded_entities` enumera los IDs encontrados y sus menciones retiradas. La
+  exclusión no modifica el corpus ni impide consultar su evidencia original.
 - `language` y `document_types` (lista, con `document_type_mode`: `only` o `exclude`)
   filtran documentos antes de construir la red, en `/network`, `/compare` y `/evidence`,
   y se combinan entre sí. Excluir tipos conserva los documentos sin tipo. El campo

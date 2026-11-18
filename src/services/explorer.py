@@ -295,6 +295,7 @@ def _filters_summary(filters: ExplorerFilters) -> dict[str, Any]:
         "ranking_metric": filters.ranking_metric,
         "top_n": filters.top_n,
         "excluded_entity_ids": list(filters.excluded_entity_ids) or None,
+        "excluded_entity_names": list(filters.excluded_entity_names),
     }
 
 
