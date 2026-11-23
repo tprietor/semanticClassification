@@ -1,5 +1,124 @@
 # Tareas
 
+## Unificación KAS en las redes actuales — 23 Nov 2026
+
+- [x] Agrupar ATT/KNOW/SKILL en KAS antes de filtrar y calcular la red;
+  conservar anotaciones, UUID, fuentes y clusters históricos.
+- [x] Actualizar metadata, evidencia, filtros y compatibilidad de clientes antiguos.
+- [x] Preparar el frontend con un único control KAS, paleta, leyendas,
+  vistas guiadas, URLs y documentación metodológica coherentes.
+- [x] Validar la suite completa: 208 pruebas backend y 631 subpruebas; 51 pruebas frontend,
+  build y lint correctos con Node 24 temporal.
+- [x] Verificar el despliegue de backend y conservación de DB/archivos/clusters.
+- [x] Publicar el frontend en Vercel; `5a97c6f`, despliegue exitoso confirmado.
+- [ ] Terminar la sincronización del código del backend entre Mac, GitHub y AWS.
+
+## Exclusiones del explorador: 48 documentos publicados — 23 Nov 2026
+
+- [x] Confirmar el alcance: redes actuales de los 48 documentos; nuevos NER
+  sin publicar y clusters/metaredes en espera.
+- [x] Registrar la lista explícita y cubrir variantes de formato y singular/plural
+  por nombre completo, en cualquier categoría, sin buscar por fragmentos.
+- [x] Auditar AWS: 66 canónicos coincidentes y 4.562 menciones asociadas;
+  preservar esas menciones y sus JSON.
+- [x] Verificar 56 pruebas y 615 subpruebas; comprobar que el frontend usa
+  los valores predeterminados del backend.
+- [x] Aplicar en AWS solo el filtro del explorador con respaldo, verificar
+  network/compare y comprobar que DB y clusters permanecen intactos.
+- [ ] Incorporar municipios únicamente cuando la usuaria indique nombres concretos.
+
+## Preservación Mac/AWS y etapa english — 20 Nov 2026
+
+- [x] Respaldar PostgreSQL local antes de recuperar estados y copiar metaredes.
+- [x] Verificar que el servicio NER local y desplegado exige english y usa
+  english_path, sin ejecutar un proveedor ni una extracción real.
+- [x] Restablecer english solo en los documentos locales pendientes, conservando
+  los que avanzaron a ner durante la operación y las 66 traducciones.
+- [x] Recuperar en la Mac los 48 JSON de fuzzyMatching con bytes idénticos a AWS,
+  conservando los NER v2 nuevos y el corpus persistido.
+- [x] Copiar los clusters y la evidencia de AWS a PostgreSQL local, conservando
+  UUID, fechas y metadata; verificar igualdad de las tablas completas.
+- [x] Corregir Postman y documentación del flujo cleaned → english → ner;
+  añadir regresión que rechaza cleaned antes de acceder al proveedor.
+- [x] Proteger los 48 UUID en el generador GLM y corregir la memoria operativa
+  para conservar english y no vaciar la carpeta NER.
+- [ ] Publicar los NER v2 terminados de manera selectiva cuando corresponda;
+  conservar las fuentes inglesas y las versiones de clusters ya calculadas.
+
+## Tres metaredes — 20 Nov 2026 (en espera por decisión del 23 Nov)
+
+- [x] Acordar las tres agrupaciones de categorías y el flujo backbone → Leiden
+  → nodo por cluster → vector → aristas por similitud → PostgreSQL.
+- [x] Confirmar la metadata de cada nuevo nodo, excluyendo Estado de revisión.
+  La especificación vigente está en `PROJECT_CONTEXT.md`.
+- [x] Confirmar coocurrencias por oración para las redes iniciales de entidades
+  y similitud de vectores para las conexiones posteriores entre clusters.
+- [x] Acordar PostgreSQL como fuente de consulta de clusters y miembros, con
+  nombre canónico representativo, descripción y vector inicialmente en SQL NULL.
+- [x] Acordar la ruta por ejecución y red bajo
+  `s3/graphs/metanetworks/agroforestry/<ejecucion>/`.
+- [x] Fijar el alcance y los parámetros de la primera ejecución, reutilizando
+  el backbone y Leiden existentes; valores y resultados en `PROJECT_CONTEXT.md`.
+- [ ] Definir la metodología del vector y su versión, la medida de similitud
+  y la regla para crear y ponderar las aristas.
+- [x] Confirmar aristas de metaredes por similitud de vectores, sustituyendo
+  el criterio de coocurrencias; por ahora solo se conectan nodos de la misma
+  red de origen, sin aristas entre las tres redes.
+- [x] Implementar un procesador para las tres proyecciones y persistencia
+  aditiva en PostgreSQL, sin Estado de revisión ni conexiones por agregación.
+- [x] Calcular y guardar los clusters de las tres redes y sus miembros, con
+  UUID propio, evidencia y procedencia, dejando nombre, descripción y vector
+  en NULL. La ejecución vigente en AWS contiene 327 clusters y 4.104 registros
+  de integrantes; la primera ejecución se conserva como referencia histórica.
+- [x] Respaldar PostgreSQL antes de publicar; verificar fuente sin cambios,
+  integridad completa, restricciones e idempotencia de la publicación.
+- [x] Descargar únicamente esta ejecución y verificar su copia local y la
+  salud de la API; no se ejecutó sincronización de la base ni de los NER.
+- [x] Resolver el umbral documental: la usuaria rechazó el mínimo de 2;
+  las nuevas ejecuciones admiten entidades presentes en un solo documento.
+- [x] Publicar y verificar una nueva ejecución con mínimo 1 documento,
+  conservando la primera ejecución como referencia histórica. Network 1 vuelve
+  a incluir KNOW, ATT y SKILL; Network 2 vuelve a incluir KNOW.
+- [x] Verificar la copia local completa de la ejecución vigente y ofrecer
+  consultas de pgAdmin que seleccionen sus 327 clusters sin mezclar ejecuciones.
+- [ ] Añadir endpoints de lectura para las nuevas ejecuciones, clusters,
+  integrantes y evidencia; los endpoints históricos no sirven este nuevo esquema.
+- [ ] Integrar la visualización en una nueva ventana llamada Dashboard del
+  frontend existente, consultando PostgreSQL mediante la API; Gephi no es
+  un requisito de la entrega.
+- [ ] Calcular y persistir las aristas entre clusters cuando se definan
+  vectores, similitud y regla de conexión.
+- [x] Retomar la revisión de sincronización Mac → AWS por pedido de la usuaria;
+  comparar bases, fuentes y NER sin modificar datos. Diagnóstico y evidencia
+  en `PROJECT_CONTEXT.md` y `export/sync_review_2026_11_20/review.json`.
+- [x] Conservar los 48 Agroforestry en fuzzyMatching y las dos ejecuciones de
+  metaredes de AWS también en la Mac; recuperar english sin retroceder avances.
+- [ ] Preparar la publicación selectiva de los nuevos NER por documento;
+  no reemplazar la base ni copiar estados locales de reinicio a AWS.
+- [ ] Publicar cuando corresponda la corrección de `57ebcb2a` en cleaned/english
+  (retirada de `》 `), con respaldo y coincidencia de fuentes para su futuro NER.
+- [ ] Continuar la auditoría de los NER v2 vigentes y publicarlos en AWS cuando
+  corresponda; la reanotación avanza y los 65 JSON archivados v1 no se suben.
+
+## Inventario auditable y vocabulario controlado — 18 Nov 2026
+
+- [x] Capturar el corpus vigente de AWS con transacción consistente y de solo lectura.
+- [x] Inventariar documentos, menciones, formas, canónicos y alias, manteniendo
+  la evidencia original y distinguiendo el alcance Agroforestry del legado global.
+- [x] Comparar JSON NER con PostgreSQL, verificar offsets y reconciliar conteos.
+- [x] Entregar Excel de revisión, TSV para OpenRefine y paquete de evidencia con
+  hashes. Estado, métricas y rutas vigentes en `PROJECT_CONTEXT.md`.
+- [x] Simplificar la edición en `editar_vocabulario.xlsx`: una sola hoja con todos
+  los términos y dos columnas principales para nombre deseado y conservar/excluir.
+- [x] Registrar las decisiones explícitas de excluir Google y usar `TFFF` como
+  nombre preferido para el nombre completo y la sigla; todavía sin aplicación en DB.
+- [ ] Revisar los 81 casos con la usuaria y documentar las decisiones; las propuestas
+  previas y las agrupaciones léxicas no implican aprobación de equivalencias.
+- [ ] Acordar el alcance y la granularidad del vocabulario a partir del inventario,
+  definiendo términos preferidos, definiciones, variantes y distinciones necesarias.
+- [ ] Diseñar cómo `fuzzy-matching` consultará esos acuerdos y cómo se revisarán
+  nuevos candidatos antes de modificar el endpoint.
+
 ## Continuidad del filtro de nodos — 18 Nov 2026
 
 - [x] Implementar y probar la exclusión por nombre en el explorador, con
@@ -11,9 +130,16 @@
   conservar los cambios locales del filtro y distinguir los nueve commits anteriores.
 - [x] Repetir las pruebas del explorador: 53 pruebas y 578 subpruebas exitosas.
 - [x] Registrar el filtro y su contexto en el mismo commit, autorizado el 18 Nov.
-- [ ] Push y despliegue requieren autorización para este cambio;
-  no se han realizado. Después del despliegue, verificar en la API real que
-  los nombres exactos se excluyen de nodos y aristas y se reportan como excluidos.
+- [x] Publicar los diez commits pendientes, incluido `e56c4b8`.
+- [x] Validar la suite local completa: 196 pruebas y 591 subpruebas exitosas.
+- [x] Comparar y respaldar los 14 archivos editados directamente en EC2;
+  conservarlos en stash y guardar la imagen anterior antes de actualizar.
+- [x] Desplegar manualmente `e56c4b8` en EC2 y verificar `/health`, `/network`,
+  `/compare` y la desactivación del filtro por nombre en un alcance vacío.
+  Resultado y evidencia vigentes en `PROJECT_CONTEXT.md`.
+- [ ] Comprobar visualmente el filtro en el dashboard después de recargarlo.
+- [ ] Resolver con soporte el bloqueo de facturación de GitHub Actions para
+  recuperar las pruebas y despliegues automáticos de futuros commits.
 
 ## Limpieza y traducción de la Guía del EUDR — 11 Nov 2026
 
@@ -253,8 +379,9 @@
 
 Decisiones: enlazar las diez categorías; importancia = recurrencia documental +
 centralidad; evolución por períodos 2021–2023 y 2024–2026; priorizar la red de
-entidades. La meta-red y los clusters quedan en espera hasta definir si los
-clusters son por categoría o mixtos.
+entidades. La pausa metodológica de meta-red y clusters se revisó el 20 Nov;
+consultar el acuerdo vigente en `PROJECT_CONTEXT.md` y las tareas de las tres
+metaredes al inicio de este archivo.
 
 - [x] `src/analysis/explorer.py` — filtros por etapa, métricas, top-n y comparación entre períodos.
 - [x] `src/services/explorer.py` y `src/api/routers/explorer.py` — `/analysis/explorer/v1/{meta,network,compare,evidence}`.
@@ -721,6 +848,10 @@ Los objetivos, visiones e intenciones no son entidades por sí mismos. Una entid
 
 ## Objetivo 10: Nodos semánticos para la meta-red 🔧
 
+Antecedente implementado: la aceptación de nodos y las conexiones por agregación
+de esta lista corresponden al enfoque anterior. Los pendientes vigentes se
+mantienen en «Tres metaredes — 20 Nov 2026» al inicio de este archivo.
+
 - [x] Prompt experto para título y descripción internos: `data/prompts/semantic_node_prompt.md`
 - [x] Modelo y migración para nodos, miembros, procedencia y soporte por incubadora
 - [x] Consulta de partición Leiden y hash del GraphML exacto
@@ -733,7 +864,3 @@ Los objetivos, visiones e intenciones no son entidades por sí mismos. Una entid
 - [x] Instantánea de aristas fuente y agregación SQL de relaciones intercluster
 - [x] `POST /semantic-network/relationships/build` y consulta de relaciones
 - [x] Exportación GraphML de la meta-red
-- [ ] Regenerar backbone y Leiden oficiales para `prac-infra-rul-v2`; volver a
-  vincular los meta-nodes con el nuevo `clustering_sha256`
-- [ ] Revisión humana y aceptación de los títulos/descripciones de los meta-nodes
-- [ ] Prompt editorial separado para describir conexiones ya calculadas

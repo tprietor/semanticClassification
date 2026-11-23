@@ -22,7 +22,9 @@ import networkx as nx
 from pydantic import ValidationError
 
 from src.analysis.cooccurrence import MentionRecord, load_db_mentions
+from src.categories import ACTIVE_CATEGORIES
 from src.analysis.explorer import (
+    DEFAULT_EXCLUDED_ENTITY_NAMES,
     PERIODS,
     ExplorerFilterError,
     ExplorerFilters,
@@ -30,6 +32,8 @@ from src.analysis.explorer import (
     build_ranked_network,
     compare_rankings,
     compute_node_metrics,
+    entity_exclusion_key,
+    exclude_entities,
     resolve_category_pairs,
     select_shown_network,
 )
@@ -61,7 +65,7 @@ ENTITIES = {
     "podas": ("podas", "PRAC"),
     "vivero": ("vivero", "soft_INFRA"),
     "plan": ("plan de manejo", "RUL"),
-    "rio": ("río Madre de Dios", "LOC"),
+    "rio": ("río Tambopata", "LOC"),
     "carretera": ("carretera", "INFRA"),
 }
 
@@ -110,13 +114,45 @@ def _pairs(network: dict) -> set[str]:
 
 
 class ExplorerNetworkTests(unittest.TestCase):
-    def test_default_links_all_ten_categories_and_counts_every_stage(self) -> None:
+    def test_kas_unifies_categories_before_pair_filtering_without_merging_ids(self):
+        source = [replace(CORPUS[0], canonical_id=category, canonical_name="shared name",
+                          category=category, start=index * 100, end=index * 100 + 5)
+                  for index, category in enumerate(("ATT", "KNOW", "SKILL"))]
+        original = list(source)
+        network = build_explorer_network(source, ExplorerFilters(
+            categories=("KAS",), link_mode="within", minimum_node_document_count=1,
+            top_n=None, excluded_entity_names=(),
+        ))
+        self.assertEqual(_node_ids(network), {"ATT", "KNOW", "SKILL"})
+        self.assertEqual({node["category"] for node in network["nodes"]}, {"KAS"})
+        self.assertEqual(_pairs(network), {"KAS--KAS"})
+        self.assertEqual(len(network["edges"]), 3)
+        self.assertEqual(source, original)
+        self.assertEqual({m.category for m in source}, {"ATT", "KNOW", "SKILL"})
+        # Las categorías originales ahora son una sola; between no puede
+        # conservar enlaces entre ATT y KNOW como si siguieran separadas.
+        with self.assertRaises(ExplorerFilterError):
+            build_explorer_network(source, ExplorerFilters(
+                categories=("ATT", "KNOW"), link_mode="between",
+            ))
+
+    def test_legacy_filters_and_pairs_select_the_whole_kas_group(self):
+        body = ExplorerNetworkRequest(
+            categories=["ATT", "KNOW", "SKILL", "CHAR"], link_mode="pairs",
+            category_pairs=[["ATT", "CHAR"], ["KNOW", "CHAR"]],
+        )
+        filters = _filters(body, top_n=None)
+        self.assertEqual(filters.categories, ("KAS", "CHAR"))
+        self.assertEqual(filters.category_pairs, (("KAS", "CHAR"),))
+
+    def test_default_links_eight_network_categories_and_counts_every_stage(self) -> None:
         network = build_explorer_network(
             CORPUS, ExplorerFilters(minimum_node_document_count=1, top_n=None)
         )
 
-        self.assertIn("KNOW", network["stages"]["categories"])
-        self.assertEqual(len(network["stages"]["categories"]), 10)
+        self.assertIn("KAS", network["stages"]["categories"])
+        self.assertFalse({"ATT", "KNOW", "SKILL"} & set(network["stages"]["categories"]))
+        self.assertEqual(len(network["stages"]["categories"]), 8)
         self.assertEqual(
             _node_ids(network), {"coop", "minero", "podas", "vivero", "plan", "rio"}
         )
@@ -350,6 +386,50 @@ class ExplorerNetworkTests(unittest.TestCase):
             network["excluded_entities"][0]["mention_count"],
             sum(mention.canonical_id == "coop" for mention in CORPUS),
         )
+
+    def test_editorial_exclusions_apply_to_all_categories_without_mutating_mentions(self):
+        mentions = [
+            MentionRecord(
+                document_id=DOC_A, sentence_id="s1", canonical_id=f"{category}-{index}",
+                canonical_name=name, category=category, text=name, start=0, end=len(name),
+                context="Evidence", ambiguity="low",
+            )
+            for category in sorted(ACTIVE_CATEGORIES)
+            for index, name in enumerate(DEFAULT_EXCLUDED_ENTITY_NAMES)
+        ]
+        original = list(mentions)
+        kept, excluded = exclude_entities(mentions, (), DEFAULT_EXCLUDED_ENTITY_NAMES)
+        self.assertEqual(kept, [])
+        self.assertEqual(len(excluded), len(mentions))
+        self.assertEqual({row["category"] for row in excluded}, ACTIVE_CATEGORIES)
+        self.assertTrue(all(row["mention_count"] == 1 for row in excluded))
+        self.assertEqual(mentions, original)
+
+    def test_editorial_exclusions_cover_format_and_noun_variants(self):
+        keys = {entity_exclusion_key(name) for name in DEFAULT_EXCLUDED_ENTITY_NAMES}
+        for name in (
+            " AGROFORESTRY ", "S.A.F.", "s.a.f.s.", "A.F.S.s", "Peru", "PERÚ.",
+            "Regio\u0301n MADRE de DIOS", "RIO MADRE-DE-DIOS", "Small-scale farmers",
+            "small scale farmer", "smallholder farmers.", "farmers’ co-operative",
+            "farmer's cooperatives.", "farmers’ associations", "NON—PROFIT ORGANIZATIONS",
+            "non profit organization", "ACTOR GROUP", "academic institutions",
+            "on site partner", "36 SITE", "agroforestry management sites",
+            "local agroforestry NGO", "MID SCALE FARMER", "non-protected area", "NGO’s",
+            "Amazon / Amazon Region",
+        ):
+            with self.subTest(name=name):
+                self.assertIn(entity_exclusion_key(name), keys)
+
+    def test_editorial_exclusions_do_not_match_substrings_or_invent_municipalities(self):
+        keys = {entity_exclusion_key(name) for name in DEFAULT_EXCLUDED_ENTITY_NAMES}
+        for name in (
+            "Agroforestry systems", "río Tambopata", "farmer training",
+            "cacao farmer training", "association of seed producers",
+            "Peruvian government", "Amazonian biodiversity",
+            "Proyecto Especial Madre de Dios research team", "Puerto Maldonado",
+        ):
+            with self.subTest(name=name):
+                self.assertNotIn(entity_exclusion_key(name), keys)
 
     def test_empty_results_return_warnings_instead_of_errors(self) -> None:
         no_mentions = build_explorer_network([], ExplorerFilters())
@@ -799,6 +879,21 @@ class ExplorerServiceTests(unittest.TestCase):
             ],
         )
 
+    def test_meta_exposes_only_kas_for_the_three_source_categories(self):
+        db = Mock()
+        db.execute.return_value.all.return_value = [("KAS", 120), ("CHAR", 42)]
+        with patch("src.services.explorer._scoped_documents", return_value=[]):
+            payload = ExplorerService.meta(db)
+        codes = {row["code"] for row in payload["categories"]}
+        self.assertEqual(len(codes), 8)
+        self.assertFalse(codes & {"ATT", "KNOW", "SKILL"})
+        kas = next(row for row in payload["categories"] if row["code"] == "KAS")
+        self.assertEqual(kas["entity_count"], 120)
+        # Comprobar que el conteo se agrupa en SQL por la categoría transformada.
+        statement = str(db.execute.call_args.args[0])
+        self.assertIn("GROUP BY CASE", statement)
+        self.assertIn("count(distinct", statement.lower())
+
     def test_unknown_period_is_rejected(self) -> None:
         with self.assertRaises(ExplorerFiltroInvalido):
             ExplorerService.network(
@@ -820,7 +915,7 @@ class ExplorerServiceTests(unittest.TestCase):
         self.assertEqual(load.call_args.kwargs["document_ids"], [DOC_A, DOC_B])
         self.assertEqual(payload["scope"]["period"], "2021-2023")
         self.assertEqual(payload["scope"]["document_count"], 2)
-        self.assertEqual(payload["version"], "entity-explorer-v1")
+        self.assertEqual(payload["version"], "entity-explorer-v1-kas")
         ExplorerNetworkResponse.model_validate(payload)
 
     def test_single_document_scope_shows_network_with_default_recurrence(self) -> None:
@@ -1025,7 +1120,7 @@ class ExplorerApiTests(unittest.TestCase):
             ExplorerNetworkRequest(excluded_entity_ids=["MADRE DE DIOS"])
 
     def test_excluded_entity_names_defaults_normalization_and_override(self) -> None:
-        default_names = ("agroforestry", "madre de dios")
+        default_names = DEFAULT_EXCLUDED_ENTITY_NAMES
         self.assertEqual(
             _filters(ExplorerNetworkRequest(), 10).excluded_entity_names, default_names
         )
@@ -1035,7 +1130,9 @@ class ExplorerApiTests(unittest.TestCase):
         request = ExplorerNetworkRequest(
             excluded_entity_names=[" Madre  de Dios ", "AGROFORESTRY", "agroforestry"]
         )
-        self.assertEqual(_filters(request, 10).excluded_entity_names, default_names)
+        self.assertEqual(
+            _filters(request, 10).excluded_entity_names, ("agroforestry", "madre de dios")
+        )
         self.assertEqual(
             _filters(ExplorerNetworkRequest(excluded_entity_names=[]), 10).excluded_entity_names,
             (),
@@ -1044,7 +1141,7 @@ class ExplorerApiTests(unittest.TestCase):
             _filters(ExplorerNetworkRequest(excluded_entity_names=["Podas"]), 10).excluded_entity_names,
             ("podas",),
         )
-        for invalid in (["  "], [""], ["x" * 201], ["x"] * 501, None):
+        for invalid in (["  "], [""], ["..."], ["---"], ["x" * 201], ["x"] * 501, None):
             with self.subTest(invalid=repr(invalid)[:30]):
                 with self.assertRaises(ValidationError):
                     ExplorerNetworkRequest(excluded_entity_names=invalid)

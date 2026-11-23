@@ -24,7 +24,7 @@ RankingMetric = Literal[
     "closeness",
     "document_count",
 ]
-Category = Literal[tuple(sorted(STORED_CATEGORIES))]  # type: ignore[valid-type]
+Category = Literal[tuple(sorted(STORED_CATEGORIES | {"KAS"}))]  # type: ignore[valid-type]
 
 
 class ExplorerScopeRequest(BaseModel):
@@ -88,7 +88,8 @@ class ExplorerFiltersRequest(BaseModel):
 
     categories: list[Category] | None = Field(
         default=None,
-        description="Categorías de nodos; null usa las diez activas y el legado presente",
+        description=("Categorías de red; null usa las ocho activas y el legado presente. "
+                     "ATT, KNOW y SKILL se interpretan como KAS"),
     )
     link_mode: LinkMode = Field(
         default="any",
@@ -117,8 +118,9 @@ class ExplorerFiltersRequest(BaseModel):
         max_length=500,
         description=(
             "Nombres canónicos completos a excluir en cualquier categoría, sin "
-            "distinguir mayúsculas ni espacios extra. Por defecto excluye Madre de "
-            "Dios y Agroforestry; [] desactiva la exclusión por nombre. La lista "
+            "distinguir mayúsculas, tildes, puntuación ni variantes nominales "
+            "de singular/plural. Por defecto usa la lista editorial del explorador; "
+            "no busca por fragmentos. [] desactiva la exclusión por nombre. La lista "
             "enviada reemplaza los valores predeterminados"
         ),
     )
@@ -362,6 +364,9 @@ class ExplorerEvidenceEntity(BaseModel):
     id: str
     name: str
     category: str
+    source_category: str | None = Field(
+        default=None, description="Categoría de la anotación original, antes de agrupar KAS"
+    )
     mention_text: str | None
 
 

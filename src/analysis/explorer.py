@@ -22,6 +22,7 @@ de un nodo no depende de cuántos nodos se dibujen. Los pasos 1 a 4
 from __future__ import annotations
 
 import copy
+import unicodedata
 from dataclasses import dataclass, replace
 from typing import Any, Literal, Sequence
 
@@ -39,16 +40,70 @@ from src.analysis.cooccurrence import (
     build_sentence_cooccurrence,
     ordered_category_pair,
 )
-from src.categories import ACTIVE_CATEGORIES, LEGACY_CATEGORIES
+from src.categories import LEGACY_CATEGORIES
+from src.analysis.network_categories import NETWORK_CATEGORIES, network_category
 
-EXPLORER_VERSION = "entity-explorer-v1"
-DEFAULT_EXCLUDED_ENTITY_NAMES = ("agroforestry", "madre de dios")
-
-
+EXPLORER_VERSION = "entity-explorer-v1-kas"
 def normalize_entity_name(value: str) -> str:
-    """Compara nombres completos sin distinguir mayúsculas ni espacios extra."""
+    """Normaliza formato, tildes y separadores sin buscar por fragmentos."""
 
-    return " ".join(value.split()).casefold()
+    value = unicodedata.normalize("NFKD", value).casefold()
+    value = "".join(
+        char for char in value
+        if not unicodedata.combining(char)
+        and char not in "'‘’ʼ＇."
+        and unicodedata.category(char) != "Pd"
+    )
+    return " ".join("".join(char if char.isalnum() else " " for char in value).split())
+
+
+_EXCLUSION_PLURALS = {
+    "actors": "actor", "adoptions": "adoption", "afss": "afs",
+    "areas": "area", "associations": "association", "cooperatives": "cooperative",
+    "departments": "department", "families": "family", "farmers": "farmer",
+    "forests": "forest", "groups": "group", "institutions": "institution",
+    "lands": "land", "ngos": "ngo", "organizations": "organization",
+    "parks": "park", "partners": "partner", "practitioners": "practitioner",
+    "projects": "project", "regions": "region", "safs": "saf",
+    "sectors": "sector", "sites": "site", "zones": "zone",
+}
+
+
+def entity_exclusion_key(value: str) -> str:
+    """Clave de nombre completo con variantes nominales explícitas y de formato.
+
+    No usa subcadenas, traducción, fuzzy matching ni stemming general. Se retienen
+    todas las palabras: excluir farmer no excluye, por ejemplo, farmer training.
+    """
+
+    return "".join(
+        _EXCLUSION_PLURALS.get(word, word)
+        for word in normalize_entity_name(value).split()
+    )
+
+
+DEFAULT_EXCLUDED_ENTITY_NAMES = tuple(sorted({normalize_entity_name(name) for name in (
+    "Agroforestry", "SAF", "SAFs", "ACTO", "association", "AFS", "AFSs",
+    "Madre de Dios", "Perú", "Amazon", "Amazon Region", "Amazon / Amazon Region",
+    "río Madre de Dios", "MDD", "Agroforestal", "Agriculture", "agroforestry adoption",
+    "actors", "actor groups", "actors in academia and the non-profit sectors",
+    "academic institution", "36 sites", "agroforestry management site",
+    "agroforestry sites", "long-term monitoring sites", "on-site partners", "one site",
+    "sampling sites", "department of Madre de Dios", "Región Madre de Dios",
+    "Proyecto Especial Madre de Dios", "south of Madre de Dios", "Agrobiodiversity zones",
+    "agroforestry management area", "agroforestry parks", "Agroforestry practitioners",
+    "local agroforestry NGOs", "NGO", "NGOs", "for-profit and nonprofit organizations",
+    "governmental and non-governmental institutions", "non-ACP private lands",
+    "non-profit organizations", "non-governmental organizations", "nonprotected areas",
+    "farmers", "Farmer", "agroforestry farmers", "cacao farmers",
+    "Colono Family-Based Farmers Colono", "conventional farmer", "farmer associations",
+    "farmers' association", "farmers' cooperative", "farmers' families",
+    "Forest Restoration Project by Family Farmers in the Eastern Amazon",
+    "interviewed farmers", "landless farmers", "large-scale farmers",
+    "local farmers association", "Nikkei farmers", "SAFTA farmers", "sample of farmers",
+    "smallscale farmers", "small farmers", "Mid-scale farmers", "smallholder farmers.",
+    "smallholder cacao farmers", "cacao cooperatives", "cooperatives", "farmer cooperatives",
+)}))
 
 LinkMode = Literal["any", "between", "within", "pairs"]
 RankingMetric = Literal[
@@ -79,9 +134,7 @@ PERIODS_BY_ID = {period["id"]: period for period in PERIODS}
 
 CATEGORY_LABELS = {
     "CHAR": "Actores",
-    "KNOW": "Saberes",
-    "ATT": "Actitudes y valores",
-    "SKILL": "Habilidades",
+    "KAS": "KAS",
     "PRAC": "Prácticas",
     "physical_INFRA": "Infraestructura física",
     "soft_INFRA": "Infraestructura de soporte",
@@ -111,6 +164,18 @@ class ExplorerFilters:
     excluded_entity_ids: tuple[str, ...] = ()
     excluded_entity_names: tuple[str, ...] = DEFAULT_EXCLUDED_ENTITY_NAMES
 
+    def __post_init__(self) -> None:
+        # URLs y clientes anteriores pueden seguir enviando las tres etiquetas.
+        if self.categories is not None:
+            object.__setattr__(self, "categories", tuple(dict.fromkeys(
+                network_category(code) for code in self.categories
+            )))
+        if self.category_pairs is not None:
+            object.__setattr__(self, "category_pairs", tuple(dict.fromkeys(
+                (network_category(a), network_category(b))
+                for a, b in self.category_pairs
+            )))
+
     def structural(self) -> "ExplorerFilters":
         """Los mismos filtros sin lo que solo afecta la selección final.
 
@@ -138,16 +203,16 @@ def resolve_categories(
     requested: Sequence[str] | None,
     mentions: Sequence[MentionRecord],
 ) -> tuple[str, ...]:
-    """Categorías de nodos; por defecto, las diez activas y el legado presente."""
+    """Ocho categorías de red y el legado presente; KAS agrupa ATT/KNOW/SKILL."""
 
     if requested:
-        unknown = sorted(set(requested) - ACTIVE_CATEGORIES - LEGACY_CATEGORIES)
+        unknown = sorted(set(requested) - NETWORK_CATEGORIES - LEGACY_CATEGORIES)
         if unknown:
             raise ExplorerFilterError("Categorías no permitidas: " + ", ".join(unknown))
         selected = set(requested)
     else:
         legacy_present = {mention.category for mention in mentions} & LEGACY_CATEGORIES
-        selected = set(ACTIVE_CATEGORIES) | legacy_present
+        selected = set(NETWORK_CATEGORIES) | legacy_present
     return tuple(sorted(selected, key=lambda category: CATEGORY_RANK[category]))
 
 
@@ -321,11 +386,11 @@ def exclude_entities(
     if not excluded_ids and not excluded_names:
         return list(mentions), ()
     wanted = set(excluded_ids)
-    names = {normalize_entity_name(name) for name in excluded_names}
+    names = {entity_exclusion_key(name) for name in excluded_names}
     wanted.update(
         mention.canonical_id
         for mention in mentions
-        if normalize_entity_name(mention.canonical_name) in names
+        if entity_exclusion_key(mention.canonical_name) in names
     )
     kept: list[MentionRecord] = []
     found: dict[str, dict[str, Any]] = {}
@@ -368,6 +433,10 @@ def build_ranked_network(
     modifica después de construirlo, así que puede reutilizarse.
     """
 
+    # Unificar antes de filtrar pares o calcular métricas, no solo al rotular.
+    # replace mantiene intactos los registros originales y sus UUID.
+    mentions = [replace(mention, category=network_category(mention.category))
+                for mention in mentions]
     mentions, excluded = exclude_entities(
         mentions, filters.excluded_entity_ids, filters.excluded_entity_names
     )

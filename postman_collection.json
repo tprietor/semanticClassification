@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Semantic Classification API",
-    "description": "API para procesamiento documental y análisis territorial socioambiental",
+    "description": "API para procesamiento documental y análisis territorial socioambiental. Flujo: raw → converted → cleaned → english → ner → fuzzyMatching. NER requiere la versión inglesa guardada.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "opencode"
   },
@@ -279,6 +279,32 @@
           "response": []
         },
         {
+          "name": "POST Translate Document",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}/translate",
+              "host": ["{{base_url}}"],
+              "path": ["documents", "{{document_id}}", "translate"]
+            },
+            "description": "Requiere status=cleaned y language registrado. Guarda s3/english/{id}.txt, registra english_path y avanza a english. Para language=en conserva los bytes originales sin proveedor; los demás idiomas se traducen."
+          },
+          "response": []
+        },
+        {
+          "name": "GET English Document",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}/english",
+              "host": ["{{base_url}}"],
+              "path": ["documents", "{{document_id}}", "english"]
+            },
+            "description": "Consulta la versión inglesa conservada en english_path, también después de avanzar a ner o fuzzyMatching."
+          },
+          "response": []
+        },
+        {
           "name": "POST Extract Entities",
           "request": {
             "method": "POST",
@@ -287,7 +313,7 @@
               "host": ["{{base_url}}"],
               "path": ["documents", "{{document_id}}", "extract-entities"]
             },
-            "description": "Extraer entidades NER del documento limpio (usa spaCy — pendiente migrar a XLM-RoBERTa)"
+            "description": "Requiere status=english y lee english_path. Extrae menciones con el codebook, guarda s3/archivosNER/{id}.json y avanza a ner conservando la traducción. Un documento en cleaned recibe 409: primero debe completar translate. El endpoint usa Anthropic; la anotación manual GLM es un flujo separado."
           },
           "response": []
         }

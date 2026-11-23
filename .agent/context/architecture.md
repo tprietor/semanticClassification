@@ -51,7 +51,63 @@ src/analysis/
 └── network_visualization.py      ← red plana estática, JSON, HTML y GraphML
 ```
 
-La capa de meta-red añade `src/models/semantic_nodes.py`,
+### Metaredes de Agroforestry — flujo acordado el 20 Nov 2026
+
+`scripts/process_metanetworks.py` construye las tres redes acordadas desde una
+captura consistente de los documentos Agroforestry en `fuzzyMatching`. Reutiliza
+coocurrencia por oración, backbone documental y Leiden; incluye todos los
+componentes del backbone. Por decisión de la usuaria se admiten entidades
+presentes en un solo documento (`minimum_node_document_count=1`); las entidades
+sin aristas quedan registradas como exclusiones. Los resultados se conservan en
+`s3/graphs/metanetworks/agroforestry/<ejecucion>/network{1,2,3}/`.
+
+La persistencia de esta etapa es aditiva y está separada de las tablas de la
+meta-red histórica. El esquema versionado está en
+`scripts/sql/metanetworks_v1.sql`, aplicado dentro de la transacción de publicación;
+no modifica la revisión de Alembic ni las tablas del corpus:
+
+- `metanetwork_runs`: UUID, huella de la fuente, documentos, configuración,
+  rutas, hashes y resumen de las tres redes.
+- `metanetwork_nodes`: UUID global por cluster, ejecución, red, comunidad,
+  procedencia y cantidades; nombre canónico, descripción, vector pgvector
+  sin dimensión prefijada y versión de metodología vectorial inicialmente NULL.
+- `metanetwork_node_members`: integrantes canónicos con nombre/categoría de
+  origen y evidencia documental y oracional. Las restricciones impiden asignar
+  una entidad a varios clusters de una misma red y ejecución o cruzar redes.
+
+No se incluye Estado de revisión ni se crean conexiones entre clusters en esta
+etapa. Las futuras aristas serán por similitud de vectores dentro de cada red.
+Los nuevos resultados aún requieren endpoints de lectura e integración en la
+ventana Dashboard del frontend existente; no utilizan las rutas históricas
+de promoción que exigen nodos aceptados.
+
+El procesador tiene tres comandos: `prepare` solo genera una carpeta nueva;
+`publish` comprueba hashes y la fuente vigente, instala el esquema e inserta en
+una sola transacción; `verify` compara todos los nodos, integrantes y evidencia
+persistida con los archivos iniciales, exige los campos diferidos en NULL y
+comprueba la conservación de la fuente. Una publicación repetida de la misma
+ejecución es idempotente; un UUID con contenido diferente se rechaza.
+El validador admite también la configuración histórica de mínimo dos documentos
+para verificar esa ejecución inmutable, sin usarla para las nuevas ejecuciones.
+`scripts/sql/consultar_metaredes.sql` ofrece consultas de solo lectura para
+pgAdmin que seleccionan la ejecución más reciente con el criterio vigente.
+
+Ejemplo de ejecución en el entorno con acceso a PostgreSQL, desde la raíz:
+
+```bash
+PYTHONPATH=. python scripts/process_metanetworks.py prepare --output s3/graphs/metanetworks/agroforestry/<ejecucion> --expected-documents 48
+PYTHONPATH=. python scripts/process_metanetworks.py publish --output s3/graphs/metanetworks/agroforestry/<ejecucion>
+PYTHONPATH=. python scripts/process_metanetworks.py verify --output s3/graphs/metanetworks/agroforestry/<ejecucion>
+```
+
+La fuente comprimida, el procesador, el esquema SQL y las huellas de los módulos
+analíticos se guardan con cada ejecución. Los JSON incluyen las redes iniciales
+y los clusters con `links: []`; GraphML es un artefacto interno del cálculo
+existente de Leiden, no un requisito para trabajar en Gephi.
+
+### Implementación histórica de meta-red
+
+La capa de meta-red anterior añade `src/models/semantic_nodes.py`,
 `src/services/semantic_nodes.py`, `src/api/schemas/semantic_nodes.py` y
 `src/api/routers/semantic_nodes.py`. Su primera entrega registra comunidades
 Leiden aceptadas como nodos titulables. Las relaciones entre nodos se construyen
@@ -189,6 +245,15 @@ un encabezado Markdown reconocible; los demás formatos requieren revisión.
 limpiar_varios: busca todos en status "converted", limpia uno a uno con rollback por documento
 ```
 
+## Etapa english: traducción previa a NER
+
+`POST /documents/{id}/translate` requiere `cleaned`, conserva el idioma original
+en `language`, guarda `s3/english/{id}.txt` y registra `english_path` y el estado
+`english`. Si el idioma original es inglés, copia el texto sin proveedor.
+`GET /documents/{id}/english` permite consultar la traducción incluso después
+de avanzar a NER o fuzzyMatching. El reinicio de una anotación debe conservar
+esta etapa y sus archivos.
+
 ## Flujo Objetivo 4: Extracción de entidades (NER vía LLM)
 
 ```
@@ -196,7 +261,8 @@ POST /documents/{id}/extract-entities
 
    → DocumentService.extraer_entidades_de_documento()
      → DocumentRepo.leer_uno()              → SELECT
-     → Storage.leer(cleaned_path)           → lee el .txt limpio
+     → validar status == 'english'         → cleaned recibe 409
+     → Storage.leer(english_path)           → lee el .txt en inglés
      → extraer_entidades(texto, document_id, document_title):
          → _cargar_prompt()                 → lee ner_prompt.md y codebook completo (caché)
            → NER_CODEBOOK_PATH              → data/codebooks/codebook_en_construccion_en.md
@@ -213,6 +279,7 @@ POST /documents/{id}/extract-entities
      → Guardar JSON en s3/archivosNER/{id}.json
      → doc.ner_path = path                   → guarda la ruta del JSON en documents
      → DocumentRepo.actualizar_status()      → status = 'ner'
+     → conservar english_path y su archivo  → traducción permanece disponible
    ← 200 + ExtractEntitiesResponse {document_id, entities: [{text, category, start, end, sentence_id, context, ambiguity}]}
 ```
 
@@ -400,8 +467,16 @@ siendo una fase posterior.
 
 Lectura en vivo para el dashboard interactivo (repo de frontend aparte). No
 escribe en PostgreSQL ni en `s3/`; reutiliza la coocurrencia por oración y el
-núcleo `document-recurrent-core-v1`. Enlaza las diez categorías por defecto y
+núcleo `document-recurrent-core-v1`. Las redes actuales usan ocho categorías:
+`CHAR`, `LOC`, `PRAC`, `RUL`, `KAS`, `physical_INFRA`, `soft_INFRA`, `eco_INFRA`;
 admite el legado `INFRA` solo si aparece en los datos.
+`src/analysis/network_categories.py` transforma `ATT`, `KNOW` y `SKILL` en
+`KAS` antes del filtrado de pares y del cálculo de métricas. Mantiene UUID,
+nombres y menciones; no cambia la taxonomía de extracción NER ni las fuentes
+persistidas. `/meta` agrupa los conteos con CASE y DISTINCT; `/evidence`
+devuelve `category=KAS` y conserva `source_category`. Los filtros antiguos
+de categorías y pares se normalizan al grupo completo. Las ejecuciones
+históricas de clusters no se recalculan ni se reescriben.
 
 ```
 POST /analysis/explorer/v1/network
@@ -443,10 +518,16 @@ POST /analysis/explorer/v1/network
   quitadas (nombre nulo si la entidad no está en el alcance). Es parte de la clave de
   la caché.
 - `excluded_entity_names` excluye nombres canónicos completos en cualquier categoría,
-  sin distinguir mayúsculas ni espacios sobrantes. Por defecto contiene
-  `agroforestry` y `madre de dios`; `[]` desactiva esta exclusión y una lista explícita
-  reemplaza esos valores. No coincide por fragmentos: `Agroforestry systems` y
-  `río Madre de Dios` se conservan. Se aplica junto a los IDs antes de construir
+  normalizando mayúsculas, tildes, espacios, puntuación, guiones y apóstrofos.
+  `entity_exclusion_key` admite singular/plural de los sustantivos configurados
+  mediante un diccionario explícito; no usa stemming general, traducción ni fuzzy
+  matching. La lista editorial predeterminada vive en `DEFAULT_EXCLUDED_ENTITY_NAMES`
+  en `src/analysis/explorer.py`, ampliada por la usuaria el 23 Nov. Incluye
+  Agroforestry, Madre de Dios, río Madre de Dios, Perú, las formas indicadas de
+  farmers/cooperatives y las demás etiquetas de ese acuerdo. No se infieren municipios.
+  `[]` desactiva esta exclusión y una lista explícita reemplaza los valores.
+  No coincide por fragmentos: `Agroforestry systems` se conserva. Se aplica junto
+  a los IDs antes de construir
   `/network` y `/compare`, recalcula métricas y forma parte de la clave de caché.
   `excluded_entities` enumera los IDs encontrados y sus menciones retiradas. La
   exclusión no modifica el corpus ni impide consultar su evidencia original.

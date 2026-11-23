@@ -211,18 +211,35 @@ class TranslationPipelineTests(unittest.TestCase):
         db = Mock()
         with (
             patch("src.services.documents.DocumentRepo.leer_uno", return_value=doc),
-            patch("src.services.documents.Storage.leer", return_value="English text."),
+            patch("src.services.documents.Storage.leer", return_value="English text.") as read,
             patch("src.services.documents.extraer_entidades", return_value=[]) as ner,
             patch("src.services.documents.Storage.guardar", return_value=Path("ner.json")),
             patch("src.services.documents.DocumentRepo.actualizar_status") as update,
         ):
             DocumentService.extraer_entidades_de_documento(db, str(document_id))
+            read.assert_called_once_with(doc.english_path)
             ner.assert_called_once()
             self.assertEqual(ner.call_args.args[0], "English text.")
             update.assert_called_once_with(db, doc, "ner")
             doc.status = "ner"
             DocumentService.revertir(db, str(document_id))
             self.assertEqual(update.call_args.args, (db, doc, "english"))
+
+    def test_ner_rejects_cleaned_without_reading_or_calling_provider(self):
+        doc = SimpleNamespace(status="cleaned", english_path="existing_translation.txt")
+        with (
+            patch("src.services.documents.DocumentRepo.leer_uno", return_value=doc),
+            patch("src.services.documents.Storage.leer") as read,
+            patch("src.services.documents.extraer_entidades") as provider,
+            patch("src.services.documents.DocumentRepo.actualizar_status") as update,
+        ):
+            with self.assertRaises(DocumentoError) as raised:
+                DocumentService.extraer_entidades_de_documento(Mock(), str(uuid4()))
+            self.assertEqual(raised.exception.codigo_http, 409)
+            self.assertIn("english", raised.exception.mensaje)
+            read.assert_not_called()
+            provider.assert_not_called()
+            update.assert_not_called()
 
     def test_routes_are_exposed(self):
         app = FastAPI()

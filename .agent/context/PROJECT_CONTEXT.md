@@ -6,19 +6,518 @@ Este documento resume el estado metodológico y técnico del proyecto de clasifi
 
 El proyecto transforma documentos de los incubadores en una base de entidades canónicas y redes semánticas auditables. La unidad de evidencia es la oración: las relaciones entre entidades se derivan de su coocurrencia dentro de `(document_id, sentence_id)` y deben poder rastrearse hasta el documento, la oración, el contexto y las entidades originales.
 
-La fase de trabajo actual con la usuaria es rehacer y auditar el NER de los
-documentos Agroforestry, empezando por validar el texto limpio y aplicando el
-codebook operativo en `data/codebooks/codebook_en_construccion_en.md`. Sus diez categorías,
+La fase actual, confirmada el 23 Nov, es trabajar únicamente con las redes
+actuales de entidades de los 48 documentos publicados, empezando por exclusiones
+de nodos del explorador. La usuaria confirmó terminada la revisión del nuevo NER;
+su publicación queda pendiente. Los clusters y las metaredes existentes quedan
+en espera y se conservan intactos. Continúa pendiente diseñar el vocabulario
+controlado y aplicar acuerdos al endpoint `fuzzy-matching`. El codebook operativo
+está en `data/codebooks/codebook_en_construccion_en.md`. Sus diez categorías,
 fichas y reglas de anotación están desarrolladas en el borrador 0.4.
 El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### KAS en las redes actuales — 23 Nov 2026
+
+Por instrucción de la usuaria, las redes agrupan `ATT`, `KNOW` y `SKILL` en
+una sola categoría `KAS`. Quedan ocho categorías activas del explorador. La
+transformación ocurre antes de seleccionar categorías/pares y calcular
+coocurrencias y métricas; no es solamente una etiqueta visual. Los UUID y
+nombres de las entidades se conservan: agrupar categorías no fusiona términos.
+
+Se aplica como proyección de lectura sobre la anotación original de los 48
+Agroforestry publicados. No se reescriben PostgreSQL, JSON NER, fuentes inglesas,
+codebook de extracción ni ejecuciones históricas de clusters. `/meta` agrega
+los conteos en KAS y `/evidence` conserva la etiqueta original en
+`source_category`; filtros antiguos se interpretan como KAS completo.
+
+**Backend desplegado y verificado en AWS.** La auditoría encontró 179 menciones
+y 120 canónicos: ATT 152/93, KNOW 17/17 y SKILL 10/10. En la proyección
+CHAR+KAS con recurrencia 1 hay 65 nodos KAS conectados; el conteo de 120 incluye
+todos los canónicos del corpus, también los que no se conectan en esa proyección.
+La comparación antes/después confirmó UUID, métricas, aristas y pesos iguales
+para el grupo completo. Se verificaron metadata, network, compare, evidencia,
+compatibilidad de filtros y conservación de las 66 exclusiones editoriales.
+Las huellas de DB, archivos NER/english y tablas de metaredes quedaron iguales.
+
+Pasaron 72 pruebas backend y 615 subpruebas. El frontend está preparado y pasó
+51 pruebas, build y lint: un solo control KAS en ambos idiomas, color compartido,
+leyendas, vistas guiadas y migración de URLs. Está en
+`export/explorer_kas_2026_11_23/frontend/` (repo `semantic-network-explorer`).
+La usuaria autorizó el commit de todos los cambios, push y publicación en
+Vercel el 23 Nov. La publicación está en curso, sincronizando únicamente código
+y conservando los datos de AWS como fuente principal.
+La suite completa previa al commit pasó: 208 pruebas y 631 subpruebas.
+El frontend quedó publicado en GitHub con `5a97c6f`; Vercel confirmó el despliegue
+exitoso `EFVDktezs4MsgyxicVmvRgX4M5VL` y el check del frontend pasó en GitHub.
+Se está alineando el código de AWS con el commit completo del backend.
+Evidencia en `export/explorer_kas_2026_11_23/deployment-result.json`;
+SSM `b2d4dee4-cc81-48f9-9aef-45fb9d1e6efa`, respaldo remoto
+`/home/ubuntu/semanticClassification/export/explorer-kas-20261123/rollback/`
+e imagen `semanticclassification-api:before-kas-20261123`.
+
+### Exclusiones editoriales del explorador — 23 Nov 2026
+
+La usuaria pidió ampliar la exclusión visual desde los dos nombres anteriores
+a la lista explícita de términos genéricos, actores y lugares. La configuración
+vigente está en `src/analysis/explorer.py`, en `DEFAULT_EXCLUDED_ENTITY_NAMES`:
+71 etiquetas normalizadas, equivalentes a 65 claves de comparación. La lista
+original sin repeticiones y el alcance están en
+`export/explorer_exclusions_2026_11_23/requested_names.json`.
+
+Se excluyen nombres canónicos **completos en cualquier categoría**, cubriendo
+mayúsculas, tildes, espacios, puntuación, guiones, apóstrofos y las variantes
+nominales de singular/plural mediante un diccionario explícito. No hay búsqueda
+por subcadenas, traducción automática ni fuzzy matching. Así se cubren Perú/Peru,
+farmers/farmer, NGO/NGOs, SAF/SAFs, AFS/AFSs y sus variantes tipográficas;
+`Agroforestry systems` y nombres más largos no pedidos siguen disponibles.
+`río Madre de Dios`, antes conservado, ahora está incluido expresamente.
+Amazon y Amazon Region se interpretan como etiquetas separadas; también se
+contempla la etiqueta combinada escrita con `/`.
+
+La auditoría fresca de los 48 documentos confirmó 3.023 canónicos en uso y
+**66 UUID coincidentes, asociados a 4.562 menciones**: 42 CHAR, 19 LOC y 5 PRAC.
+Esas menciones se omiten al construir la red; no se eliminan de PostgreSQL ni
+de los JSON. No aparecen como nombres canónicos independientes SAF, SAFs,
+río Madre de Dios o Agroforestal; sus reglas quedan configuradas igualmente.
+No se añadieron municipios: la usuaria no dio nombres concretos.
+
+El cambio quedó **aplicado en AWS** con respaldo de los dos archivos de código
+y de la imagen anterior. Se actualizaron solamente `src/analysis/explorer.py`
+y `src/api/schemas/explorer.py`, sin migraciones, reemplazo de la base, nuevas
+extracciones ni recálculo de clusters. Las verificaciones de producción en
+`/network` y `/compare` confirmaron las exclusiones, la respuesta saludable y
+la conservación de la opción explícita `excluded_entity_names: []`.
+El frontend omite ese campo y utiliza los valores predeterminados del backend;
+no fue necesario modificar ni desplegar el frontend. Para una pestaña ya
+abierta, recargar el dashboard permite solicitar los resultados nuevos.
+
+Con el resto de filtros predeterminados y sin top-n, la red pasó de 462 nodos
+y 3.515 aristas a **434 nodos y 2.638 aristas**. La cifra de 66 excluidos se
+refiere a todos los canónicos coincidentes del corpus: algunos ya estaban
+ocultos o no superaban los umbrales de visualización. Las métricas se calculan
+después de excluirlos. Las huellas de menciones, oraciones, canónicos y alias,
+los conteos globales y las huellas completas de las tres tablas de metaredes
+permanecieron idénticos antes y después del cambio.
+
+Pasaron 56 pruebas y 615 subpruebas del explorador, incluidas categorías,
+normalización, variantes, ausencia de coincidencias por fragmentos, métricas,
+comparación y sobrescritura explícita de la lista. Dependencias de prueba en
+`/private/tmp/explorer-exclusions-deps-20261123/`, sin modificar la venv.
+Evidencia y scripts en `export/explorer_exclusions_2026_11_23/`, especialmente
+`impact.json`, `excluded_nodes.json` y `deployment-result.json`.
+
+Se utilizó el canal SSM ya disponible porque cambió la IP de la Mac y SSH no
+respondía; no se modificaron reglas de red. Comando de despliegue SSM:
+`0734483f-d2ba-4cb7-8ec6-62f4fa5a7b0c`. Respaldo remoto de código y registro:
+`/home/ubuntu/semanticClassification/export/explorer-exclusions-20261123/`;
+imagen `semanticclassification-api:before-exclusions-20261123`.
+El cambio de estos dos archivos está aplicado sobre el código del servidor,
+conservando el commit base; todavía no se hizo commit ni push de esta entrega.
+
+### Tres metaredes: metodología y metadata acordadas — 20 Nov 2026
+
+**En espera por decisión de la usuaria del 23 Nov.** Se conservan los resultados;
+la fase actual modifica solamente las redes de entidades del explorador.
+
+La usuaria confirmó construir tres redes de entidades separadas:
+
+| Red | Categorías |
+|---|---|
+| Network 1 | CHAR, KNOW, ATT, SKILL |
+| Network 2 | CHAR, PRAC, KNOW, RUL |
+| Network 3 | CHAR, PRAC, physical_INFRA, soft_INFRA, eco_INFRA |
+
+El flujo acordado es construir cada red, obtener su backbone y calcular sus
+clusters con Leiden. Cada cluster se registra como un nuevo nodo global con
+UUID propio y vínculos con las entidades integrantes. Después se asignará su
+vector mediante una metodología todavía por definir; las aristas se calcularán
+por similitud entre esos vectores y se persistirán en PostgreSQL con los UUID
+de sus extremos y el valor de la conexión.
+
+La usuaria confirmó que **las aristas de las metaredes corresponden a la
+similitud de los vectores de sus nodos**, sustituyendo el criterio anterior
+basado en coocurrencias entre las entidades miembro de los clusters.
+**Por ahora las tres metaredes permanecen separadas:** solo se calculan y
+persisten conexiones entre nodos de la misma red de origen; no se crean aristas
+entre Network 1, Network 2 y Network 3. Esta decisión se refiere a las aristas
+entre los nuevos nodos de clusters; las reglas y pesos de las redes iniciales
+de entidades se concretarán por separado.
+
+La usuaria confirmó mantener **coocurrencias por oración para las tres redes
+iniciales de entidades**; sobre ellas se obtiene el backbone y se aplica Leiden.
+La similitud de vectores se utilizará después, exclusivamente para las aristas
+entre los nuevos nodos que representan clusters dentro de cada metared.
+
+**Frecuencia documental:** la usuaria rechazó explícitamente el mínimo de dos
+documentos. Las nuevas ejecuciones admiten entidades presentes en un solo
+documento (`minimum_node_document_count=1`); no se exige recurrencia entre
+documentos. El backbone existente sigue excluyendo entidades sin aristas
+de coocurrencia dentro de la proyección, con el motivo registrado por entidad.
+
+La primera etapa debe guardar los clusters y sus miembros en **PostgreSQL**,
+con UUID propio, red de origen, evidencia y procedencia. Los campos **Nombre
+canónico representativo**, **Descripción** y **Vector** se guardarán como SQL
+`NULL`, no como texto `"null"` ni como vector de ceros, para completarlos después.
+La metodología y versión del vector también permanecen sin asignar hasta su
+definición. No se calculan todavía aristas entre clusters.
+
+La ruta acordada para los archivos de cada ejecución es:
+
+```text
+s3/graphs/metanetworks/agroforestry/<ejecucion>/
+  network1/
+  network2/
+  network3/
+```
+
+PostgreSQL será la fuente de consulta para la visualización. La usuaria no
+requiere abrir resultados en Gephi: la visualización se integrará en el
+dashboard existente, mediante una nueva ventana llamada **Dashboard**.
+La construcción y persistencia de clusters preceden a esa integración visual;
+no se ha implementado ni desplegado todavía esta nueva ventana.
+
+La metadata confirmada corresponde a **cada nuevo nodo que representa un
+cluster**:
+
+| Metadata | Contenido |
+|---|---|
+| UUID | Identificador propio del nodo, independiente de su nombre. |
+| Nombre canónico representativo | Nombre que expresa el cluster dentro de su red. |
+| Descripción | Significado y alcance del cluster. |
+| Red de origen | Network 1, Network 2 o Network 3. |
+| Entidades integrantes y evidencia | Entidades miembro y evidencia documental que sustenta el cluster. |
+| Procedencia del cálculo | Versión del corpus, backbone, parámetros de Leiden y cluster original. |
+| Vector y versión de su metodología | Valores y método utilizado para obtenerlos; pendientes hasta definir la metodología. |
+
+La usuaria excluyó explícitamente **Estado de revisión**: no se incorpora a
+esta metadata la distinción entre propuesto, revisado y aceptado.
+
+Esta decisión metodológica reemplaza para las tres nuevas metaredes el criterio
+anterior de agregar pesos de aristas fuente entre clusters y la exigencia de
+nodos aceptados. Los endpoints históricos conservan ese enfoque anterior
+(sección 11); el nuevo procesador por lotes y sus tablas se describen abajo.
+Los pendientes de definición e implementación están en `tasks.md`.
+
+La usuaria pidió conservar en **Mac y AWS** los 48 documentos Agroforestry en
+`fuzzyMatching`, sus JSON y los clusters, y proteger la etapa `english` de los
+66 documentos traducidos. Se recuperaron los JSON y se copiaron las tablas de
+metaredes a la Mac sin modificar datos remotos. El resultado vigente está abajo;
+la revisión anterior se conserva como diagnóstico histórico.
+
+### Preservación Mac/AWS y recuperación de english — 20 Nov 2026, 22:31 UTC
+
+**Los 48 JSON ya existen en `s3/archivosNER/` de la Mac**, con hashes idénticos
+a los del servidor. Se recuperaron desde la captura auditable local del
+18 Nov, probando la serialización hasta obtener exactamente los bytes con
+SHA-256 de AWS; la copia fresca confirmó esos mismos hashes y la igualdad
+completa con las menciones persistidas. No se recalculó NER ni fuzzy matching
+para estos documentos. Sus menciones, oraciones, canónicos y alias de PostgreSQL
+permanecen intactos e iguales en ambas bases.
+
+Se copiaron a PostgreSQL local `metanetwork_runs`, `metanetwork_nodes` y
+`metanetwork_node_members`: **2 ejecuciones, 353 nodos (327 vigentes y 26
+históricos), 4.892 registros de integrantes**. Se conservaron todos los UUID,
+fechas de creación, metadata y evidencia originales; no se recalcularon clusters.
+Las tres huellas de tablas completas coinciden con AWS. Los artefactos bajo
+`s3/graphs/metanetworks/agroforestry/` también están verificados en la Mac.
+
+**Se conservaron los 66 archivos ingleses sin reescribirlos ni traducirlos de
+nuevo.** La reanotación continuó durante esta operación: al corregir los estados,
+63 documentos seguían en cleaned y 3 ya habían avanzado a ner. Se restableció
+english únicamente en los 63 pendientes; los 3 avanzados conservaron ner,
+sus JSON y english_path. Estado local verificado al terminar: 48 fuzzyMatching,
+63 english, 3 ner y 1 cleaned (Guía EUDR). Son cifras de ese momento, ya que la
+reanotación puede continuar. AWS conserva 48 fuzzyMatching, 66 english y 1 cleaned.
+Los nuevos NER locales no se publicaron aún en AWS. Se alineó además el idioma
+local de `70767dc6` a `en`, conservando la corrección anterior de AWS.
+
+El contrato real del servicio **ya exigía english tanto en el código local como
+en el código desplegado en AWS**: NER lee english_path y conserva la traducción
+al avanzar a ner. Se comprobó en el servicio de AWS con I/O y proveedor simulados,
+sin llamada real al modelo ni cambios de DB. La colección de Postman describía
+todavía NER desde cleaned con spaCy/XLM-RoBERTa y no incluía traducción: se
+añadieron POST Translate Document, GET English Document y la descripción correcta
+de Extract Entities. Se corrigió el flujo de `architecture.md` y se añadió una
+regresión que exige 409 para cleaned antes de leer archivos o llamar al proveedor.
+Pasaron 14 pruebas y 3 subpruebas de traducción/NER y del lote de metaredes.
+No fue necesario modificar ni desplegar el código del endpoint NER.
+
+La protección operativa del trabajo GLM está en
+`data/output/ner_glm/protected_documents.json`, con los 48 UUID protegidos y los
+66 documentos con traducción. `generar_artefactos.py` rechaza un UUID protegido
+antes de escribir archivos y exige que exista su fuente inglesa. La memoria
+`data/output/ner_glm/CONTEXTO_TAREA.md` ahora exige partir de english para NER y
+prohíbe vaciar la carpeta NER o perder la traducción en un reinicio. Los 65 JSON
+GLM v1 archivados no se restauraron ni se publicaron. La carpeta local contenía
+51 JSON al verificar: 48 protegidos y 3 NER v2 en progreso.
+
+Evidencia y scripts reproducibles en `export/preserve_aws_mac_2026_11_20/`:
+`english_restoration.json`, `json_recovery.json`, `restoration.json`,
+`final_local_verification.json`, `compact_proof.json` y el respaldo previo de
+PostgreSQL `local_before.dump` (14 MB). La descarga directa de 10 MB fue lenta;
+se reutilizaron artefactos locales solo tras comprobar sus hashes de archivos
+y las huellas **completas** de las tres tablas contra la captura fresca de AWS.
+La copia completa verificada es `snapshot_materialized.tgz` (10 MB), con
+`materialized_receipt.json` que registra la prueba y la huella de origen.
+Se detuvieron únicamente las dos descargas redundantes de esta tarea; sus
+parciales se conservaron como `.partial`. AWS no se restauró ni se reemplazó.
+
+La diferencia anterior de `57ebcb2a` (retirada local de `》 `) se conservó sin
+sobrescribir ninguna de las versiones inglesas. Antes de publicar su futuro
+NER deberá verificarse y alinear su fuente exacta. La sincronización futura
+continúa siendo selectiva por documento; `DATA_PRIMARY=aws` sigue activo.
+
+### Diagnóstico previo de sincronización — 20 Nov 2026, 21:40 UTC
+
+La usuaria pidió revisar la sincronización. Se inventariaron las dos bases y
+los hashes de archivos; **no se modificaron las bases ni archivos de entrada**.
+`DATA_PRIMARY=aws` permanece intacto. Evidencia, consultas reproducibles y
+diagnóstico en `export/sync_review_2026_11_20/review.json`.
+
+Ambas bases contienen los mismos 193 documentos, 64.280 menciones globales,
+61.253 canónicos y 12.129 oraciones. Para los 48 Agroforestry en fuzzyMatching
+coinciden las huellas completas de menciones, oraciones, canónicos vinculados
+y alias. La eliminación anterior de JSON locales no eliminó esos datos de DB.
+
+| Alcance Agroforestry | Mac | AWS |
+|---|---:|---:|
+| fuzzyMatching | 48 | 48 |
+| english | 0 | 66 |
+| ner | 1 | 0 |
+| cleaned | 66 | 1 |
+
+Los estados locales se utilizan en el reinicio del trabajo NER v2 y no se deben
+copiar literalmente a AWS: 65 documentos locales en cleaned están en english
+en AWS. Otra diferencia de metadata es `70767dc6`: Mac aún indica `es`, AWS
+conserva la corrección a `en`; no debe sobrescribirse con el dato local antiguo.
+
+Las 66 traducciones ya existen en AWS: 65 son idénticas byte por byte. La única
+diferencia afecta a `57ebcb2a-8ba5-463d-a89a-6dffd4b2877d`
+(*Modelos-de-negocio-agroforestal-espanol.pdf*): la Mac retiró `》 ` (carácter
+residual y espacio; 4 bytes) tanto del texto limpio como del inglés. Los otros
+194 de los 195 textos limpios son idénticos. La corrección cambia posiciones
+posteriores en el texto: antes de publicar su futuro NER debe alinearse también
+la fuente inglesa exacta. Las dos diferencias están guardadas como `.diff`
+en el directorio de revisión; no se aplicaron en AWS.
+
+El NER GLM v1 se archivó deliberadamente por cobertura insuficiente, según
+`data/output/ner_glm/CONTEXTO_TAREA.md`; sus 65 JSON están en
+`data/output/ner_glm_backup_v1/archivosNER_json/` y **no son candidatos de
+publicación**. La reanotación v2 tiene actualmente un único JSON vigente:
+`32eea2e1-16cd-44f1-ae54-84f48724c85e` (*Income_stacking_and_income_diversification.pdf*),
+con 19 menciones. Coinciden los hashes del manifiesto y de la fuente inglesa
+de AWS; `_parsear_datos` devolvió las mismas 19 menciones sin issues. Está en
+ner en la DB local y english en AWS; su manifiesto aún indica
+`ner_generated_pending_human_audit`. No se infiere aprobación semántica de la
+validación estructural ni se lo publicó durante esta revisión.
+
+La Mac no tiene tablas `metanetwork_*` en su PostgreSQL. AWS conserva dos
+ejecuciones, 353 nodos (327 vigentes y 26 históricos) y 4.892 registros de
+integrantes. `resync-from-mac.sh` reemplazaría la base entera y haría perder esas
+tablas; sigue bloqueado y no es el mecanismo apropiado. Tampoco se debe ejecutar
+una descarga masiva de `s3/` que mezcle los 195 JSON antiguos del servidor con
+la carpeta local de reanotación v2, que actualmente contiene un JSON.
+
+La publicación debe ser selectiva por documento: verificar la versión exacta
+de la fuente, respaldar cualquier archivo que se reemplace, subir únicamente
+artefactos vigentes y actualizar solo ner_path/status del documento terminado
+(english → ner). No propagar borrados locales, no restaurar v1, no retroceder
+estados de AWS, no ejecutar fuzzy matching ni regenerar metaredes como efecto
+de esa publicación. La implementación y publicación del sincronizador siguen
+pendientes en `tasks.md`.
+
+### Ejecución vigente sin filtro de recurrencia documental — 20 Nov 2026
+
+La usuaria rechazó el mínimo de dos documentos. Se actualizó el procesador
+para construir las tres redes con `minimum_node_document_count=1`, admitiendo
+entidades presentes en un solo documento, y se publicó una **nueva ejecución**
+en PostgreSQL de AWS. Los demás parámetros del backbone y de Leiden, las
+exclusiones exactas de nombres y la separación de las redes se conservaron.
+
+Ejecución vigente: **`6c90bfd6-db31-4a19-8758-09425d4a8214`**.
+Ruta: **`s3/graphs/metanetworks/agroforestry/20261120T124610Z/`**.
+La fuente sigue siendo exactamente los 48 documentos y sus 23.135 menciones,
+con la misma huella `879b831590de6e70d1d3c1f9a9d24381d296905dc5f690d33f795e730d057dc5`.
+
+| Red | Entidades del backbone | Aristas del backbone | Clusters | Categorías presentes |
+|---|---:|---:|---:|---|
+| Network 1 | 599 | 1.152 | 69 | CHAR, KNOW, ATT, SKILL |
+| Network 2 | 1.669 | 4.791 | 126 | CHAR, PRAC, KNOW, RUL |
+| Network 3 | 1.836 | 5.284 | 132 | CHAR, PRAC, physical_INFRA, soft_INFRA, eco_INFRA |
+
+Se guardaron **327 nuevos nodos y 4.104 registros de integrantes** (conteo por
+red, no entidades globales únicas), con su evidencia completa. Nombre canónico,
+descripción, vector y versión de su metodología permanecen en SQL NULL.
+No se han creado aristas entre clusters. Se conservan todos los componentes
+del backbone; las entidades sin aristas siguen documentadas como exclusiones.
+
+La ejecución inicial de 26 clusters permanece intacta como referencia
+histórica. Por ello `metanetwork_nodes` contiene ambas ejecuciones: para leer
+el resultado vigente se debe filtrar por el UUID nuevo o usar
+`scripts/sql/consultar_metaredes.sql`, que selecciona la ejecución más reciente
+con criterio de un documento. No usar el UUID de la primera consulta de pgAdmin
+para consultar los nuevos resultados.
+
+Antes de publicar se verificó un respaldo remoto de 18 MB en
+`/home/ubuntu/semanticClassification/export/metanetwork-before-20261120T124610Z.dump`.
+La publicación y `verify` confirmaron la correspondencia completa entre archivos
+y PostgreSQL, los valores NULL, la conservación de la fuente y las categorías
+previstas de cada red. `/health` sigue respondiendo `{"status":"ok"}`.
+Pasaron 11 pruebas locales y 3 subpruebas, incluyendo una regresión explícita
+para entidades presentes en un solo documento; el nuevo validador también
+permite verificar la ejecución histórica sin cambiar el criterio de las nuevas.
+Se descargó y verificó la ejecución completa en la misma ruta local, con
+respaldo de transporte de 12 MB en
+`export/metanetworks_2026_11_20/execution_min1.tgz`. Los hashes coinciden y
+ninguna entidad figura excluida por frecuencia documental. Las consultas
+`scripts/sql/consultar_metaredes.sql` se ejecutaron contra AWS y devolvieron
+327 clusters en la primera consulta y 89 integrantes para Network 1 / C001.
+
+### Primera ejecución histórica con mínimo dos documentos — 20 Nov 2026
+
+La usuaria autorizó procesar las tres redes. El procesador reproducible está
+en `scripts/process_metanetworks.py` y el esquema SQL aditivo en
+`scripts/sql/metanetworks_v1.sql`. Se ejecutó en el contenedor API de EC2,
+reutilizando los módulos actuales de coocurrencia, backbone y Leiden, sin
+reiniciar ni reemplazar la aplicación desplegada.
+
+Fuente: 48 documentos Agroforestry en `fuzzyMatching`, 23.135 menciones, captura
+`REPEATABLE READ` de PostgreSQL. Huella del contenido fuente:
+`879b831590de6e70d1d3c1f9a9d24381d296905dc5f690d33f795e730d057dc5`.
+Los parámetros iniciales adoptan la configuración existente: backbone
+`document-recurrent-core-v1`, recurrencia mínima de 2 documentos, peso
+`fractional-document`; Leiden `modularity`, resolución 1, semilla 42,
+iteraciones hasta convergencia y todos los componentes del backbone.
+Se permiten pares de entidades de igual o distinta categoría dentro de cada
+red. Se mantienen las exclusiones exactas del explorador `agroforestry` y
+`madre de dios`, sin modificar la fuente. Las entidades bajo el umbral o sin
+aristas entre entidades elegibles quedan registradas en `excluded.json`.
+
+| Red | Entidades iniciales | Entidades del backbone | Aristas del backbone | Clusters |
+|---|---:|---:|---:|---:|
+| Network 1 | 823 | 125 | 318 | 11 |
+| Network 2 | 2.042 | 311 | 1.563 | 8 |
+| Network 3 | 2.232 | 352 | 1.776 | 7 |
+
+Se publicaron **26 nodos con UUID global y 788 registros de integrantes** en
+`metanetwork_runs`, `metanetwork_nodes` y `metanetwork_node_members`.
+Los integrantes se cuentan por red, no como 788 entidades distintas del corpus.
+Nombre canónico representativo (`canonical_name`), descripción (`description`),
+vector (`vector`, tipo pgvector sin dimensión prefijada) y versión del método
+vectorial (`vector_method_version`) quedaron en SQL NULL. No hay Estado de
+revisión ni aristas entre clusters; el nombre de cada entidad integrante sí
+se conserva como evidencia de origen.
+
+Ejecución: `b35b368e-1ae3-4f17-9aeb-c609ed3a14ca`.
+Archivos en `s3/graphs/metanetworks/agroforestry/20261120T122830Z/`, con las
+tres subcarpetas, `manifest.json`, fuente comprimida, procesador y esquema.
+Cada red incluye red inicial, backbone, partición Leiden, CSV de comunidades
+e integrantes y `clusters.json` con `links: []`. Los hashes permiten comprobar
+que la partición y su evidencia no cambiaron.
+
+Antes de publicar se creó y leyó íntegramente el respaldo remoto
+`/home/ubuntu/semanticClassification/export/metanetwork-before-20261120T122830Z.dump`
+(15 MB). La publicación fue transaccional, con bloqueo de escritura de las
+tablas fuente durante la comparación e inserción. Su comprobación íntegra
+confirmó la conservación de los 48 documentos y sus menciones; una segunda
+publicación de la misma ejecución fue idempotente. La revisión Alembic permanece
+`f0a1b2c3d4e5`: estas tablas se gestionan con el esquema SQL versionado del lote.
+
+Verificación: 9 pruebas locales y 3 subpruebas de proyecciones, backbone y Leiden
+exitosas; prueba del esquema en PostgreSQL temporal, revertida completamente,
+incluyendo nulabilidad, repetición del DDL y rechazo de integrantes duplicados,
+categorías inválidas y cruces de red. `verify` comparó todos los nodos,
+integrantes y evidencia contra los archivos y volvió a comprobar la fuente.
+Scripts de auditoría operativa en `export/metanetworks_2026_11_20/`.
+La consulta final confirmó los estados 48 `fuzzyMatching`, 66 `english` y
+1 `cleaned`; `/health` respondió `{"status":"ok"}`. Se descargó únicamente
+esta ejecución a la misma ruta local y se verificaron todos sus hashes y la
+integridad de los 26 nodos contra sus particiones; el archivo de transporte está
+en `export/metanetworks_2026_11_20/execution.tgz` (9,4 MB).
+
+**Limitación observada:** con recurrencia mínima de 2 documentos, Network 1
+conserva 125 entidades CHAR y ninguna KNOW, ATT o SKILL. Se excluyeron por el
+umbral documental las 17 KNOW, 93 ATT y 10 SKILL iniciales; Network 2 también
+queda sin KNOW. Es una consecuencia del filtro, no ausencia de esas categorías
+en la fuente ni eliminación de sus datos. La usuaria resolvió la decisión
+rechazando el mínimo de dos documentos y autorizando la admisión de entidades
+presentes en un solo documento. La primera ejecución se conserva íntegra como
+referencia histórica; no es el criterio vigente.
+Como apoyo a esa decisión se calculó una comparación **solo local, sin
+publicación en PostgreSQL**, con umbral de 1 documento y los demás parámetros
+iguales: Network 1 conserva 599 entidades y produce 69 clusters (CHAR, KNOW,
+ATT y SKILL presentes); Network 2 conserva 1.669 y produce 126 clusters
+(CHAR, PRAC, KNOW y RUL presentes); Network 3 conserva 1.836 y produce 132
+clusters (sus cinco categorías presentes). Las entidades sin aristas siguen
+excluidas por el backbone. Resultados exploratorios en
+`export/metanetworks_2026_11_20/threshold1_preview/comparison.json`.
+La ventana Dashboard y sus endpoints de lectura aún están pendientes.
+
+### Inventario auditable del vocabulario — 18 Nov 2026
+
+La usuaria pidió preparar el inventario antes de acordar términos, definiciones
+y sinónimos, siguiendo el enfoque de preparación de datos compartido de Jessica
+Talisman. Se consultó la fuente principal de AWS con una transacción
+`REPEATABLE READ`, `READ ONLY`, sin ejecutar NER, fuzzy matching ni fusiones.
+La captura terminó a las `2026-11-18T16:53:06.143098+00:00`.
+
+Alcance: los **115 documentos Agroforestry**, todas las categorías y estados,
+incluidas las entidades ocultas por defecto en el dashboard. La fuente actual
+confirma **48 documentos en fuzzyMatching, 66 en english y uno en cleaned**.
+Las **23.135 menciones** de los 48 documentos contienen **3.561 cadenas literales
+distintas**, **3.584 pares categoría + forma literal**, **3.023 canónicos en uso**
+y **3.286 alias registrados para esos canónicos**. La cifra histórica de 3.584
+formas se interpreta aquí explícitamente como pares categoría + texto.
+
+El inventario identifica **81 casos de revisión**: 24 formas en varias categorías,
+15 alias vinculados a varios canónicos de la misma categoría, una forma repartida
+entre canónicos, 16 agrupaciones por huella léxica y 25 propuestas históricas que
+siguen divididas. Estos 25 grupos reúnen 5.717 menciones. Los casos se superponen:
+afectan a 6.209 menciones distintas y no equivalen a errores ni uniones aprobadas.
+Pasaron los 32 controles de integridad, incluidas la comparación completa de los
+JSON NER contra PostgreSQL y la literalidad de los offsets contra `cleaned`.
+Esto no valida la exhaustividad o corrección semántica del NER; 2.344 menciones
+conservan la marca `medium` de la fuente.
+
+Entrega: `outputs/vocabulary_inventory_2026_11_18/inventario_vocabulario_agroforestry.xlsx`
+y `inventario_auditable_agroforestry.zip` en la misma carpeta. El paquete incluye
+TSV para OpenRefine, evidencia por mención, relaciones caso–mención, diccionario,
+metodología, captura fuente y hashes. La captura y los scripts reproducibles están
+en `export/vocabulary_inventory_2026-11-18/`. SHA-256 de la captura comprimida:
+`adcbc569eea99b3f02b5d3ca7feb4122b36207bad9fbff29a1e237d50dbc0eb6`.
+
+La tabla canónica actual solo tiene ID, nombre y categoría: no registra definición
+ni aprobación terminológica. Como contexto separado, la base global contiene
+61.253 canónicos y 42.146 no tienen menciones actuales; no se propone eliminarlos.
+Los acuerdos de revisión, el diseño del vocabulario y cualquier cambio del endpoint
+siguen pendientes en `tasks.md`. No se modificó el código de producción ni la DB.
+
+**Archivo de edición simplificado:** la usuaria indicó que las siete hojas del
+inventario y la ausencia de TFFF en los 81 casos dificultaban la edición. Se creó
+`outputs/vocabulary_inventory_2026_11_18/editar_vocabulario.xlsx`, con una única
+hoja `Editar` y todos los 3.584 pares categoría + texto. Este es el archivo de
+trabajo para sus cambios. D permite indicar el nombre deseado, E permite elegir
+`Conservar` o `Excluir`, y G contiene un comentario opcional. Los nombres actuales
+precargados conservan el estado de origen; no representan aprobación humana de
+todos los términos. Los IDs siguen disponibles para reconciliar cada cambio.
+
+Decisiones explícitas registradas en esta edición: excluir cualquier entidad cuyo
+texto o nombre canónico contenga `google`, sin distinguir mayúsculas, en todas las
+categorías y documentos actuales/futuros; unificar `TFFF` y
+`Tropical Forests Forever Facility` en `soft_INFRA` bajo el nombre preferido
+**`TFFF`**. En el alcance observado, la regla Google corresponde a cuatro formas
+y cinco menciones, y TFFF a dos formas y siete menciones. Las decisiones están
+también en `acuerdos_vocabulario.json`; no se han aplicado a PostgreSQL ni a la API.
+El inventario original y su ZIP se conservaron íntegros como evidencia de origen.
+
 ### Continuidad del filtro del explorador — 18 Nov 2026
 
 La tarea más reciente es ocultar del explorador los nodos con nombre canónico
 exacto `Madre de Dios` o `Agroforestry`, en cualquier categoría. El cambio está
-guardado localmente: `excluded_entity_names` usa ambos nombres por defecto,
+commiteado, publicado y desplegado en EC2 como `e56c4b8`:
+`excluded_entity_names` usa ambos nombres por defecto,
 ignora mayúsculas y espacios sobrantes y se combina con `excluded_entity_ids`.
 Se aplica antes de construir la red y calcular métricas en `/network` y
 `/compare`, con exclusiones incluidas en la clave de caché y en la respuesta.
@@ -41,11 +540,29 @@ nueve commits locales por delante de `origin/feat/explorador-entidades`.
 Esos nueve commits recogen los cambios anteriores del proyecto y
 pasaron la suite completa: **193 pruebas y 586 subpruebas**. Inventario:
 `export/commit_review_2026-11-11/created_commits.json`.
-El 13 Nov se guardó el punto para apagar el equipo sin commit. El 18 Nov la
-usuaria autorizó el commit del filtro y su documentación; ambos se incluyen
-en el mismo commit. **El push y el despliegue siguen pendientes** y el dashboard
-en AWS todavía no incorpora este filtro. Los siguientes pasos se registran en
-`tasks.md`, bajo «Continuidad del filtro de nodos».
+El 13 Nov se guardó el punto para apagar el equipo sin commit. El 18 Nov se creó
+`e56c4b8`, se publicaron los diez commits pendientes y la usuaria ejecutó el
+despliegue manual. Antes del despliegue pasó la suite local completa:
+**196 pruebas y 591 subpruebas**, con dos advertencias de dependencias.
+GitHub Actions no llegó a iniciar las pruebas por un bloqueo de facturación de
+la cuenta; el reintento repitió el bloqueo. La pantalla de facturación mostraba
+GitHub Free y $0 facturable; la causa concreta queda pendiente de soporte.
+
+Se compararon los 14 archivos modificados directamente en EC2 con el commit:
+13 eran idénticos y el prompt de traducción solo tenía una línea vacía adicional.
+Se respaldaron los archivos y la imagen anterior, se conservaron los cambios en
+un stash y se actualizó el servidor desde `f900018` hasta `e56c4b8`. La revisión
+de Alembic ya era `f0a1b2c3d4e5`; no hubo migraciones pendientes.
+
+El registro local confirma `VERIFIED_DEPLOY_OK` para el SHA completo. La API
+respondió a `/health`; la red real excluyó `agroforestry` PRAC (664 menciones)
+y `MADRE DE DIOS` LOC (411 menciones), con **462 nodos y 3.515 aristas** bajo
+los filtros predeterminados y sin recorte top-n. Se verificaron `/network`,
+`/compare` y la desactivación mediante `excluded_entity_names: []` en un alcance
+vacío. Se actualizó el marcador de despliegue del temporizador al mismo commit.
+Evidencia local: `export/deploy_e56c4b8/`; detalles y respaldo remoto en
+`../sessions/2026-11-18-despliegue-filtro-explorador.md`. La API que consume el
+dashboard ya incorpora el filtro; queda pendiente la comprobación visual del frontend.
 
 ### Limpieza de la Guía del EUDR — 11 Nov 2026
 
@@ -969,7 +1486,11 @@ La generación bajo `s3/graphs/` está implementada y validada por tests; la
 ejecución real sobre el corpus completo queda pendiente antes de retirar el
 almacenamiento histórico.
 
-## 9. Próximos pasos técnicos
+## 9. Antecedente de próximos pasos técnicos — superado el 20 Nov 2026
+
+La lista siguiente documenta el enfoque anterior. El acuerdo vigente está en
+«Tres metaredes: metodología y metadata acordadas»; las tareas vigentes están
+en `tasks.md`.
 
 1. Regenerar los artefactos oficiales del backbone y Leiden para
    `prac-infra-rul-v2`, registrar su nuevo SHA-256 y volver a vincular los
@@ -981,10 +1502,14 @@ almacenamiento histórico.
 4. Asociar `CHAR` y `LOC` a cada configuración mediante las oraciones que soportan
    sus entidades miembro.
 
-Leiden y la construcción de la meta-red están implementados. La metodología
-aprobada para las conexiones intercluster se describe en la sección 11.
+Leiden y la construcción de la meta-red anterior están implementados. La sección
+11 describe esa implementación, no el nuevo criterio de similitud de vectores.
 
 ## 11. Promoción de comunidades a nodos semánticos
+
+**Implementación anterior:** el acuerdo del 20 Nov sustituye para las tres
+nuevas metaredes las conexiones por agregación y el requisito de aceptación
+descritos aquí. El código aún conserva este comportamiento anterior.
 
 El prompt editorial está en `data/prompts/semantic_node_prompt.md`. Describe las
 relaciones internas respaldadas por entidades, aristas y oraciones; no clasifica

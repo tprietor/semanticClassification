@@ -27,6 +27,9 @@ CATEGORY_ORDER = tuple(
 CATEGORY_RANK = {
     category: index for index, category in enumerate(STORED_CATEGORY_ORDER)
 }
+# Categoría agregada del explorador. No modifica las proyecciones históricas
+# ni las categorías que admite la extracción NER.
+CATEGORY_RANK["KAS"] = len(CATEGORY_RANK)
 # Selección de la proyección histórica prac-infra-rul-v2, no taxonomía NER.
 SEMANTIC_CORE_CATEGORIES = ("PRAC", "INFRA", "RUL")
 

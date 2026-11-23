@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Hashable, Sequence
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from src.analysis.cooccurrence import CATEGORY_RANK, load_db_mentions
@@ -37,7 +37,10 @@ from src.analysis.explorer import (
     compare_rankings,
     select_shown_network,
 )
-from src.categories import ACTIVE_CATEGORIES, CATEGORY_DEFINITIONS, LEGACY_CATEGORIES
+from src.categories import CATEGORY_DEFINITIONS, LEGACY_CATEGORIES
+from src.analysis.network_categories import (
+    KAS_DEFINITION, KAS_SOURCE_CATEGORIES, NETWORK_CATEGORIES, network_category,
+)
 from src.models.canonical_entities import CanonicalEntity
 from src.models.documents import Document
 from src.models.entities import Entity
@@ -321,11 +324,15 @@ class ExplorerService:
         scope = ExplorerScope(productive_sector=productive_sector)
         documents = _scoped_documents(db, scope)
         all_ready = _scoped_documents(db, ExplorerScope(productive_sector=None))
+        category = case(
+            (Entity.category.in_(sorted(KAS_SOURCE_CATEGORIES)), "KAS"),
+            else_=Entity.category,
+        )
         category_statement = (
-            select(Entity.category, func.count(func.distinct(Entity.canonical_id)))
+            select(category, func.count(func.distinct(Entity.canonical_id)))
             .join(Document, Document.id == Entity.document_id)
             .where(Document.status == READY_STATUS)
-            .group_by(Entity.category)
+            .group_by(category)
         )
         if productive_sector is not None:
             category_statement = category_statement.where(
@@ -336,12 +343,12 @@ class ExplorerService:
             {
                 "code": code,
                 "label": CATEGORY_LABELS.get(code, code),
-                "definition": CATEGORY_DEFINITIONS.get(code),
+                "definition": KAS_DEFINITION if code == "KAS" else CATEGORY_DEFINITIONS.get(code),
                 "legacy": code in LEGACY_CATEGORIES,
                 "entity_count": int(category_counts.get(code, 0)),
             }
             for code in sorted(
-                set(ACTIVE_CATEGORIES) | (set(category_counts) & LEGACY_CATEGORIES),
+                set(NETWORK_CATEGORIES) | (set(category_counts) & LEGACY_CATEGORIES),
                 key=lambda code: CATEGORY_RANK[code],
             )
         ]
@@ -597,7 +604,8 @@ class ExplorerService:
             entity = {
                 "id": str(row.canonical_id),
                 "name": row.canonical_name,
-                "category": row.category,
+                "category": network_category(row.category),
+                "source_category": row.category,
                 "mention_text": row.mention_text,
             }
             if entity not in sentence["entities"]:
