@@ -46,12 +46,23 @@ Pasaron 72 pruebas backend y 615 subpruebas. El frontend está preparado y pasó
 leyendas, vistas guiadas y migración de URLs. Está en
 `export/explorer_kas_2026_11_23/frontend/` (repo `semantic-network-explorer`).
 La usuaria autorizó el commit de todos los cambios, push y publicación en
-Vercel el 23 Nov. La publicación está en curso, sincronizando únicamente código
+Vercel el 23 Nov. La publicación terminó, sincronizando únicamente código
 y conservando los datos de AWS como fuente principal.
 La suite completa previa al commit pasó: 208 pruebas y 631 subpruebas.
 El frontend quedó publicado en GitHub con `5a97c6f`; Vercel confirmó el despliegue
 exitoso `EFVDktezs4MsgyxicVmvRgX4M5VL` y el check del frontend pasó en GitHub.
-Se está alineando el código de AWS con el commit completo del backend.
+La revisión visual del dominio público confirmó un único control KAS (120),
+sin los controles separados de Knowledge, Attitudes y Skills. El JavaScript
+público usa el gateway HTTPS vigente y la API devuelve los 48 documentos.
+El commit completo del backend `d69414f` está publicado y aplicado en AWS;
+GitHub Actions también terminó correctamente para ese commit. La copia de
+código del servidor quedó limpia y la imagen se reconstruyó con el commit.
+Las verificaciones posteriores confirmaron DB, NER/english y clusters intactos,
+API saludable y las 66 exclusiones. Las cinco ediciones manuales anteriores
+se conservaron en stash `46432cbfd92011bff923501734b1cb7cc6893d57` antes de
+avanzar la rama. No hubo reemplazo de base, sincronización de datos ni recálculo
+de clusters. Recibos en `synchronization-result.json` y
+`public-verification.json`, dentro de `export/explorer_kas_2026_11_23/`.
 Evidencia en `export/explorer_kas_2026_11_23/deployment-result.json`;
 SSM `b2d4dee4-cc81-48f9-9aef-45fb9d1e6efa`, respaldo remoto
 `/home/ubuntu/semanticClassification/export/explorer-kas-20261123/rollback/`

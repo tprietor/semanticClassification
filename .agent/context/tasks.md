@@ -11,7 +11,10 @@
   build y lint correctos con Node 24 temporal.
 - [x] Verificar el despliegue de backend y conservación de DB/archivos/clusters.
 - [x] Publicar el frontend en Vercel; `5a97c6f`, despliegue exitoso confirmado.
-- [ ] Terminar la sincronización del código del backend entre Mac, GitHub y AWS.
+- [x] Sincronizar el código del backend entre Mac, GitHub y AWS, respaldando
+  las ediciones manuales y conservando DB, fuentes y clusters.
+- [x] Verificar el dominio público: un único control KAS, 120 canónicos y API
+  con los 48 documentos; frontend y backend con checks exitosos en GitHub.
 
 ## Exclusiones del explorador: 48 documentos publicados — 23 Nov 2026
 
@@ -138,8 +141,9 @@
   `/compare` y la desactivación del filtro por nombre en un alcance vacío.
   Resultado y evidencia vigentes en `PROJECT_CONTEXT.md`.
 - [ ] Comprobar visualmente el filtro en el dashboard después de recargarlo.
-- [ ] Resolver con soporte el bloqueo de facturación de GitHub Actions para
-  recuperar las pruebas y despliegues automáticos de futuros commits.
+- [x] Comprobar que GitHub Actions volvió a ejecutar las pruebas: el check
+  del backend `d69414f` terminó correctamente el 23 Nov. El bloqueo observado
+  el 18 Nov no impidió esta publicación.
 
 ## Limpieza y traducción de la Guía del EUDR — 11 Nov 2026
 
