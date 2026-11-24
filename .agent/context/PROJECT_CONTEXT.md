@@ -20,6 +20,34 @@ El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### Amazonas, Brazilian Amazon y nombres aislados land/forest — 24 Nov 2026
+
+Se amplía la exclusión de LOC a los nombres completos **Amazonas** (30
+menciones en seis documentos) y **Brazilian Amazon** (88 en 16 documentos).
+La usuaria añadió **land** y **forest** y confirmó explícitamente que deben
+salir **en todas las categorías cuando aparecen solos**. La normalización
+nominal ya acordada también cubre lands/forests, mayúsculas y puntuación.
+Los compuestos como land use, forest management o forest resources se conservan.
+
+Land/forest afectan seis canónicos y **186 menciones**: 57 LOC, 128 eco_INFRA
+y una PRAC. Sumados a las dos localizaciones anteriores son **304 menciones
+adicionales**, sin cambiar PostgreSQL ni JSON. La política completa contiene
+124 nombres globales y 24 acotados a LOC, con **148 canónicos y 8.167 menciones
+excluidas**, 1.263 del lote nuevo de 11. Continúan los 59 documentos publicados;
+Brazil nut conserva sus 118 menciones eco_INFRA y los clusters no se recalculan.
+
+Las pruebas del explorador verifican los nombres completos en las diez
+categorías originales y conservan compuestos y palabras que contienen esas
+letras: **68 pruebas y 705 subpruebas** correctas. Auditorías y recibos:
+`export/exclude_amazon_locations_2026_11_24/` y
+`export/exclude_land_forest_2026_11_24/`; las copias remotas tienen los mismos
+nombres con guiones y fecha 20261124. La publicación usa imágenes mínimas,
+respaldo de fuentes y comprobación integral de tablas y archivos.
+AWS confirmó ambas auditorías iguales a Mac, con tablas, archivos y clusters
+intactos. La red completa final tiene **3.510 nodos y 12.720 aristas**. Se
+verificó que desactivar solo cada ampliación reproduce su red anterior y que
+las exclusiones previas y Brazil nut permanecen conservados.
+
 ### Brazil nut: corregir el span y la categoría — 24 Nov 2026
 
 La usuaria pidió corregir Brazi/Brazil cuando la extracción era un fragmento

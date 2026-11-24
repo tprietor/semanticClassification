@@ -1,5 +1,15 @@
 # Tareas
 
+## Amazonas, Brazilian Amazon y land/forest aislados — 24 Nov 2026
+
+- [x] Excluir Amazonas y Brazilian Amazon de LOC: dos canónicos, 118 menciones.
+- [x] Confirmar con la usuaria land/forest completos en todas las categorías;
+  incluir plurales explícitos y conservar términos compuestos.
+- [x] Auditar seis canónicos y 186 menciones adicionales; conservar Brazil nut
+  con 118 menciones eco_INFRA y todos los datos, traducciones y clusters.
+- [x] Verificar 68 pruebas y 705 subpruebas del explorador y preparar publicación
+  respaldada y sincronización Git. Recibos en export/exclude_land_forest_2026_11_24.
+
 ## Brazil nut: extracción completa y eco_INFRA — 24 Nov 2026
 
 - [x] Auditar 611 menciones Brazil/LOC, verificar offsets y distinguir 118

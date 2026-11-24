@@ -388,6 +388,20 @@ class ExplorerNetworkTests(unittest.TestCase):
         self.assertTrue(by_id["forests"]["partial"])
         self.assertEqual(exclude_entities(mentions, (), (), ()), (mentions, ()))
 
+    def test_land_and_forest_exclude_whole_names_in_all_categories_only(self):
+        excluded_forms = ("land", "LAND", "lands", "forest", "Forest", "forests")
+        compounds = ("land use", "forest management", "forest resources", "woodland", "landscape")
+        for category in sorted(ACTIVE_CATEGORIES):
+            with self.subTest(category=category):
+                mentions = [MentionRecord(
+                    document_id=DOC_A, sentence_id="s1", canonical_id=str(index),
+                    canonical_name=name, category=category, text=name,
+                    start=0, end=len(name), context="Evidence", ambiguity="low",
+                ) for index, name in enumerate((*excluded_forms, *compounds))]
+                kept, excluded = exclude_entities(mentions, (), DEFAULT_EXCLUDED_ENTITY_NAMES)
+                self.assertEqual([m.text for m in kept], list(compounds))
+                self.assertEqual(sum(e["mention_count"] for e in excluded), len(excluded_forms))
+
     def test_default_name_exclusions_match_all_ids_before_building_metrics(self) -> None:
         with patch.dict(
             ENTITIES,
