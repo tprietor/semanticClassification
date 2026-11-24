@@ -20,6 +20,26 @@ El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### Eastern Amazon excluido de LOC — 24 Nov 2026
+
+La usuaria pidió retirar **Eastern Amazon** como nombre completo. Se añade a
+la política acotada a LOC, antes de construir coocurrencias y calcular métricas,
+incluyendo las formas Eastern Amazon/eastern Amazon por normalización de caso.
+La auditoría identifica el canónico `4a082a7b-6f59-42d3-95cb-a139ef03fc72`, con
+**24 menciones en ocho documentos**, todas del lote original de 48. Se conservan
+los datos originales, las otras categorías, las exclusiones anteriores y
+Brazil nut/eco_INFRA con sus 118 menciones.
+
+Política completa: 124 nombres globales y 25 acotados a LOC; **149 canónicos y
+8.191 menciones excluidas**, 1.263 del lote nuevo de 11. Continúan los 59
+documentos publicados. Pasaron **68 pruebas y 705 subpruebas** del explorador.
+Auditorías y recibos: `export/exclude_eastern_amazon_2026_11_24/`; respaldo
+remoto: `export/exclude-eastern-amazon-20261124/`. La publicación comprueba
+la conservación integral de ocho tablas, archivos fuente y clusters históricos.
+AWS confirmó la misma auditoría que Mac y la conservación de esos datos. La
+red completa pasa de 3.510 nodos/12.720 aristas a **3.509 nodos/12.698 aristas**;
+desactivar solo Eastern Amazon reproduce exactamente la red anterior.
+
 ### Amazonas, Brazilian Amazon y nombres aislados land/forest — 24 Nov 2026
 
 Se amplía la exclusión de LOC a los nombres completos **Amazonas** (30

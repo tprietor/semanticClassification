@@ -1,5 +1,13 @@
 # Tareas
 
+## Eastern Amazon — 24 Nov 2026
+
+- [x] Añadir Eastern Amazon a LOC y auditar 24 menciones en ocho documentos.
+- [x] Verificar 68 pruebas y 705 subpruebas del explorador, preservando las
+  otras exclusiones y Brazil nut/eco_INFRA.
+- [x] Preparar publicación con respaldo, comprobación de datos/archivos/clusters
+  y sincronización Git. Recibos en export/exclude_eastern_amazon_2026_11_24.
+
 ## Amazonas, Brazilian Amazon y land/forest aislados — 24 Nov 2026
 
 - [x] Excluir Amazonas y Brazilian Amazon de LOC: dos canónicos, 118 menciones.

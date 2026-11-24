@@ -120,7 +120,7 @@ DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY: tuple[tuple[str, tuple[str, ...]], ..
         "PEM", "Amazonian forests", "eastern Peruvian Amazon", "Central American region",
         "North of Peru", "Puerto Maldonado – Iñapari", "Southeast of Peru",
         "western part of the Amazon basin", "Tambopata River", "Madre de Dios River",
-        "Amazonas", "Brazilian Amazon",
+        "Amazonas", "Brazilian Amazon", "Eastern Amazon",
     )}))),
 )
 
