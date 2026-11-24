@@ -9,6 +9,10 @@ from rapidfuzz import fuzz
 from sqlalchemy.orm import Session
 
 from src.categories import LEGACY_CATEGORY_ALIASES, STORED_CATEGORIES
+from src.controlled_vocabulary import (
+    ROAD_CANONICAL_CATEGORY, ROAD_CANONICAL_NAME, ROAD_RULE_ID,
+    is_road_pavement_alias,
+)
 from src.models.canonical_entities import CanonicalEntity
 from src.models.canonical_entities_repo import CanonicalEntityRepo
 from src.models.canonical_entity_aliases import CanonicalEntityAlias
@@ -17,7 +21,7 @@ from src.models.canonical_entity_aliases_repo import CanonicalEntityAliasRepo
 # La extracción admite solo las diez activas; los JSON históricos pueden
 # conservar INFRA hasta su reclasificación contextual.
 VALID_CATEGORIES = STORED_CATEGORIES
-RESOLUTION_VERSION = "deterministic-v3"
+RESOLUTION_VERSION = "deterministic-v4-roads"
 FUZZY_THRESHOLDS = {
     **dict.fromkeys(VALID_CATEGORIES, 96.0),
     "CHAR": 93.0,
@@ -197,6 +201,7 @@ class MentionPlan:
     strategy: str
     confidence: float
     details: dict[str, Any]
+    canonical_category: str | None = None
 
 
 @dataclass(frozen=True)
@@ -388,7 +393,7 @@ def asociar_entidades_canonicas(
 
     grupos: dict[tuple[str, str], list[int]] = defaultdict(list)
     for index, (mencion, plan) in enumerate(zip(menciones, planes, strict=True)):
-        grupos[(mencion["category"], plan.comparison_key)].append(index)
+        grupos[(plan.canonical_category or mencion["category"], plan.comparison_key)].append(index)
 
     decisiones: dict[int, MatchDecision] = {}
     for (categoria, comparison_key), indices in grupos.items():
@@ -427,6 +432,8 @@ def asociar_entidades_canonicas(
             **plan.details,
         }
         mencion_asociada = dict(mencion)
+        if plan.canonical_category is not None:
+            mencion_asociada["category"] = decision.canonical_entity.category
         mencion_asociada["canonical_id"] = decision.canonical_entity.id
         mencion_asociada["canonical_name"] = decision.canonical_entity.canonical_name
         mencion_asociada["match_type"] = match_type
@@ -481,6 +488,22 @@ def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
     planes: list[MentionPlan] = []
     for mencion in menciones:
         texto = _nombre_canonico(mencion["text"])
+        if is_road_pavement_alias(texto):
+            planes.append(
+                MentionPlan(
+                    preferred_name=ROAD_CANONICAL_NAME,
+                    comparison_key=normalizar_nombre(ROAD_CANONICAL_NAME),
+                    strategy="road_pavement",
+                    confidence=100.0,
+                    details={
+                        "rule": ROAD_RULE_ID,
+                        "source_name": texto,
+                        "source_category": mencion["category"],
+                    },
+                    canonical_category=ROAD_CANONICAL_CATEGORY,
+                )
+            )
+            continue
         if mencion["category"] == "PRAC" and normalizar_nombre(texto) in _SAF_ALIASES:
             planes.append(
                 MentionPlan(
@@ -538,7 +561,7 @@ def _detectar_aliases_persona(
 ) -> dict[int, tuple[str, float, dict[str, Any]]]:
     formas: list[PersonForm] = []
     for index, (mencion, plan) in enumerate(zip(menciones, planes, strict=True)):
-        if mencion["category"] != "CHAR" or plan.strategy == "generic_actor":
+        if mencion["category"] != "CHAR" or plan.strategy != "standard":
             continue
         tokens = _tokens_nombre_persona(mencion["text"])
         if tokens is not None:
@@ -690,7 +713,7 @@ def _cantidad_acentos(texto: str) -> int:
 
 
 def _seleccionar_plan_representativo(planes: list[MentionPlan]) -> MentionPlan:
-    prioridad = {"controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0}
+    prioridad = {"road_pavement": 4, "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0}
     return max(
         planes,
         key=lambda plan: (
@@ -726,6 +749,12 @@ def _decidir_canonica(
     if exactas:
         candidata = _mejor_canonica_exacta(exactas, texto_preferido)
         return MatchDecision(candidata, "exact", 100.0, None, "normalized_exact_name")
+
+    if estrategia == "road_pavement":
+        return _crear_canonica(
+            db, texto_preferido, categoria, candidatos, normalizados,
+            reason="editorial_road_pavement",
+        )
 
     ids_alias = aliases_por_categoria.get((categoria, nombre_normalizado), set())
     if len(ids_alias) == 1:
@@ -869,6 +898,8 @@ def _metodo_para_mencion(
     mencion: dict[str, Any], plan: MentionPlan, decision: MatchDecision
 ) -> tuple[str, float]:
     texto = _nombre_canonico(mencion["text"])
+    if plan.strategy == "road_pavement":
+        return "controlled_alias", plan.confidence
     if plan.strategy == "generic_actor" and texto != plan.preferred_name:
         return "morphology", plan.confidence
     if plan.strategy == "controlled_alias" and normalizar_nombre(texto) != plan.comparison_key:

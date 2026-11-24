@@ -41,9 +41,12 @@ from src.analysis.cooccurrence import (
     ordered_category_pair,
 )
 from src.categories import LEGACY_CATEGORIES
+from src.controlled_vocabulary import (
+    ROAD_EXCLUDED_ENTITY_NAMES, SAF_EXCLUDED_ENTITY_NAMES, is_saf_entity_name,
+)
 from src.analysis.network_categories import NETWORK_CATEGORIES, network_category
 
-EXPLORER_VERSION = "entity-explorer-v1-kas"
+EXPLORER_VERSION = "entity-explorer-v1-kas-roads"
 def normalize_entity_name(value: str) -> str:
     """Normaliza formato, tildes y separadores sin buscar por fragmentos."""
 
@@ -63,7 +66,7 @@ _EXCLUSION_PLURALS = {
     "departments": "department", "families": "family", "farmers": "farmer",
     "forests": "forest", "groups": "group", "institutions": "institution",
     "lands": "land", "ngos": "ngo", "organizations": "organization",
-    "parks": "park", "partners": "partner", "practitioners": "practitioner",
+    "parks": "park", "partners": "partner", "plots": "plot", "practitioners": "practitioner",
     "projects": "project", "regions": "region", "safs": "saf",
     "sectors": "sector", "sites": "site", "zones": "zone",
 }
@@ -83,8 +86,10 @@ def entity_exclusion_key(value: str) -> str:
 
 
 DEFAULT_EXCLUDED_ENTITY_NAMES = tuple(sorted({normalize_entity_name(name) for name in (
-    "Agroforestry", "SAF", "SAFs", "ACTO", "association", "AFS", "AFSs",
+    "Agroforestry", *SAF_EXCLUDED_ENTITY_NAMES, "ACTO", "association", "AFS", "AFSs", "plot",
+    "pilot plots", "plots 5 and 6", *ROAD_EXCLUDED_ENTITY_NAMES,
     "Madre de Dios", "Perú", "Amazon", "Amazon Region", "Amazon / Amazon Region",
+    "the Amazon", "Amazonia", "peruvian amazon",
     "río Madre de Dios", "MDD", "Agroforestal", "Agriculture", "agroforestry adoption",
     "actors", "actor groups", "actors in academia and the non-profit sectors",
     "academic institution", "36 sites", "agroforestry management site",
@@ -379,6 +384,10 @@ def exclude_entities(
 ) -> tuple[list[MentionRecord], tuple[dict[str, Any], ...]]:
     """Quita las menciones de las entidades excluidas y describe cada una.
 
+    Los nombres se comparan también con el texto literal: un alias excluido
+    no se recupera por tener otro nombre canónico. En ese caso se quita solo
+    esa mención, conservando las demás formas del mismo canónico.
+
     Una entidad pedida que no aparece en el alcance se informa con nombre nulo, para
     que la interfaz pueda mostrarla y permitir quitarla del filtro.
     """
@@ -387,15 +396,21 @@ def exclude_entities(
         return list(mentions), ()
     wanted = set(excluded_ids)
     names = {entity_exclusion_key(name) for name in excluded_names}
+    saf_family = entity_exclusion_key("SAF") in names
+
+    def excluded_name(value: str) -> bool:
+        return entity_exclusion_key(value) in names or (saf_family and is_saf_entity_name(value))
+
     wanted.update(
         mention.canonical_id
         for mention in mentions
-        if entity_exclusion_key(mention.canonical_name) in names
+        if excluded_name(mention.canonical_name)
     )
     kept: list[MentionRecord] = []
     found: dict[str, dict[str, Any]] = {}
     for mention in mentions:
-        if mention.canonical_id in wanted:
+        if (mention.canonical_id in wanted
+                or excluded_name(mention.text)):
             entity = found.setdefault(
                 mention.canonical_id,
                 {
@@ -408,12 +423,19 @@ def exclude_entities(
             entity["mention_count"] += 1
         else:
             kept.append(mention)
+    remaining: dict[str, int] = {}
+    for mention in kept:
+        remaining[mention.canonical_id] = remaining.get(mention.canonical_id, 0) + 1
+    for entity_id, entity in found.items():
+        entity["partial"] = bool(remaining.get(entity_id, 0))
+        entity["remaining_mention_count"] = remaining.get(entity_id, 0)
     described = tuple(
         found.get(
             entity_id,
-            {"id": entity_id, "name": None, "category": None, "mention_count": 0},
+            {"id": entity_id, "name": None, "category": None, "mention_count": 0,
+             "partial": False, "remaining_mention_count": 0},
         )
-        for entity_id in sorted(wanted)
+        for entity_id in sorted(wanted | set(found))
     )
     return kept, described
 

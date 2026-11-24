@@ -23,6 +23,7 @@ from pydantic import ValidationError
 
 from src.analysis.cooccurrence import MentionRecord, load_db_mentions
 from src.categories import ACTIVE_CATEGORIES
+from src.controlled_vocabulary import is_saf_entity_name
 from src.analysis.explorer import (
     DEFAULT_EXCLUDED_ENTITY_NAMES,
     PERIODS,
@@ -311,8 +312,11 @@ class ExplorerNetworkTests(unittest.TestCase):
                     "name": "cooperativa",
                     "category": "CHAR",
                     "mention_count": coop_mentions,
+                    "partial": False,
+                    "remaining_mention_count": 0,
                 },
-                {"id": "fantasma", "name": None, "category": None, "mention_count": 0},
+                {"id": "fantasma", "name": None, "category": None, "mention_count": 0,
+                 "partial": False, "remaining_mention_count": 0},
             ],
         )
         self.assertEqual(full["excluded_entities"], [])
@@ -387,6 +391,56 @@ class ExplorerNetworkTests(unittest.TestCase):
             sum(mention.canonical_id == "coop" for mention in CORPUS),
         )
 
+    def test_literal_exclusions_survive_alias_canonicalization_and_future_documents(self):
+        mentions = [
+            MentionRecord(document_id=doc, sentence_id="s1", canonical_id="systems", canonical_name="sistemas agroflorestais",
+                          category="PRAC", text=text, start=0, end=len(text), context="Evidence", ambiguity="low")
+            for doc, text in ((DOC_A, "SAF"), (DOC_B, "SAFs"), (DOC_C, "Agroforestry systems"))
+        ]
+        original = list(mentions)
+        kept, excluded = exclude_entities(mentions, (), DEFAULT_EXCLUDED_ENTITY_NAMES)
+        self.assertEqual([m.text for m in kept], ["Agroforestry systems"])
+        self.assertEqual(excluded[0]["mention_count"], 2)
+        self.assertTrue(excluded[0]["partial"])
+        self.assertEqual(excluded[0]["remaining_mention_count"], 1)
+        self.assertEqual(mentions, original)
+        self.assertEqual(exclude_entities(mentions, (), ()), (mentions, ()))
+        kept, excluded = exclude_entities(mentions, ("systems",), ())
+        self.assertEqual(kept, [])
+        self.assertEqual(excluded[0]["mention_count"], 3)
+        self.assertFalse(excluded[0]["partial"])
+
+    def test_entire_saf_family_is_excluded_in_all_categories_and_new_documents(self):
+        for category in sorted(ACTIVE_CATEGORIES):
+            with self.subTest(category=category):
+                mentions = [MentionRecord(
+                    document_id=DOC_C, sentence_id="new-s1", canonical_id="translated-system", canonical_name="sistemas agroflorestais",
+                    category=category, text=text, start=0, end=len(text), context="Evidence", ambiguity="low",
+                ) for text in ("SAFs-A", "SAFs-F", "SAF-Dendê", "SAF 14", "SAF type IV", "SAFs-X", "SAF implementation")]
+                kept, excluded = exclude_entities(mentions, (), DEFAULT_EXCLUDED_ENTITY_NAMES)
+                self.assertEqual(kept, [])
+                self.assertEqual(excluded[0]["mention_count"], len(mentions))
+                self.assertFalse(excluded[0]["partial"])
+                self.assertEqual(exclude_entities(mentions, (), ()), (mentions, ()))
+
+    def test_saf_family_does_not_match_other_words(self):
+        for text in ("SAFA", "SAFTA", "SAFTA farmers", "safe drinking water", "safety", "safeguards"):
+            with self.subTest(text=text):
+                self.assertFalse(is_saf_entity_name(text))
+        for text in ("SAFs-A", "SAFsA", "SAFsF", "S.A.F.s-F", "SAF-dendê", "SAF type II", "new SAFs-B variant"):
+            with self.subTest(text=text):
+                self.assertTrue(is_saf_entity_name(text))
+
+    def test_literal_exclusions_run_before_cooccurrence_and_metrics(self):
+        mentions = _sentences((DOC_A, "s1", ("coop", "podas")), (DOC_B, "s2", ("coop", "podas")))
+        # Same preferred name, but one source mention is an explicitly excluded alias.
+        mentions[0] = replace(mentions[0], text="farmers")
+        actual = build_explorer_network(mentions, ExplorerFilters(minimum_node_document_count=1, top_n=None))
+        expected = build_explorer_network(mentions[1:], ExplorerFilters(minimum_node_document_count=1, top_n=None))
+        self.assertEqual(actual["nodes"], expected["nodes"])
+        self.assertEqual(actual["edges"], expected["edges"])
+        self.assertEqual(actual["stages"], expected["stages"])
+
     def test_editorial_exclusions_apply_to_all_categories_without_mutating_mentions(self):
         mentions = [
             MentionRecord(
@@ -415,7 +469,11 @@ class ExplorerNetworkTests(unittest.TestCase):
             "non profit organization", "ACTOR GROUP", "academic institutions",
             "on site partner", "36 SITE", "agroforestry management sites",
             "local agroforestry NGO", "MID SCALE FARMER", "non-protected area", "NGO’s",
-            "Amazon / Amazon Region",
+            "Amazon / Amazon Region", "plot", "Plot", "PLOT.", "plots", "PLOTS", "plot’s",
+            "pilot plots", "Pilot plot", "PLOTS 5 AND 6", "ROAD CONSTRUCTION.",
+            "Leticia-Tarapaca road", "Leticia–Tarapaca Road", "NEW ROAD", "ROADS.",
+            "Transamazonica Road Region", "new roads", "NEW ROADS.",
+            "the Amazon", "THE AMAZON.", "Amazonia", "Amazônia", "AMAZONÍA", "Peruvian Amazon",
         ):
             with self.subTest(name=name):
                 self.assertIn(entity_exclusion_key(name), keys)
@@ -427,6 +485,11 @@ class ExplorerNetworkTests(unittest.TestCase):
             "cacao farmer training", "association of seed producers",
             "Peruvian government", "Amazonian biodiversity",
             "Proyecto Especial Madre de Dios research team", "Puerto Maldonado",
+            "agroforestry plots", "demonstration plots", "research plots",
+            "Plot design", "Plot preparation", "Field", "chacras",
+            "road", "road networks", "road access", "road building",
+            "rural roads", "logging roads", "railroads", "road construction training",
+            "Peruvian Amazon research team", "Amazonian biodiversity research",
         ):
             with self.subTest(name=name):
                 self.assertNotIn(entity_exclusion_key(name), keys)
@@ -854,6 +917,21 @@ class ExplorerServiceTests(unittest.TestCase):
         self.assertEqual(payload["scope"]["document_type_mode"], "only")
         ExplorerNetworkResponse.model_validate(payload)
 
+    def test_evidence_preserves_original_category_after_editorial_canonicalization(self):
+        db = Mock()
+        db.execute.return_value.all.return_value = [SimpleNamespace(
+            document_id=UUID(DOC_A), sentence_id="s-road", sentence_text="Evidence of road building",
+            canonical_id=UUID(DOC_B), canonical_name="road pavement", category="physical_INFRA",
+            resolution_details={"source_category": "PRAC"}, mention_text="road building",
+        )]
+        with patch("src.services.explorer._scoped_documents", return_value=[self._document(DOC_A, 2022)]):
+            payload = ExplorerService.evidence(db, DOC_B, DOC_C, ExplorerScope())
+        entity = payload["items"][0]["entities"][0]
+        self.assertEqual(entity["name"], "road pavement")
+        self.assertEqual(entity["category"], "physical_INFRA")
+        self.assertEqual(entity["source_category"], "PRAC")
+        self.assertEqual(entity["mention_text"], "road building")
+
     def test_meta_lists_document_types_by_document_count(self) -> None:
         documents = [
             SimpleNamespace(
@@ -915,7 +993,7 @@ class ExplorerServiceTests(unittest.TestCase):
         self.assertEqual(load.call_args.kwargs["document_ids"], [DOC_A, DOC_B])
         self.assertEqual(payload["scope"]["period"], "2021-2023")
         self.assertEqual(payload["scope"]["document_count"], 2)
-        self.assertEqual(payload["version"], "entity-explorer-v1-kas")
+        self.assertEqual(payload["version"], "entity-explorer-v1-kas-roads")
         ExplorerNetworkResponse.model_validate(payload)
 
     def test_single_document_scope_shows_network_with_default_recurrence(self) -> None:

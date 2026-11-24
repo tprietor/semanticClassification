@@ -1,5 +1,109 @@
 # Tareas
 
+## Publicación web y consolidación — 24 Nov 2026
+
+- [x] Revisar todos los cambios pendientes de backend y frontend y comprobar
+  que las cinco fuentes de runtime coinciden con AWS.
+- [x] Verificar backend completo: 216 pruebas y 711 subpruebas.
+- [x] Verificar frontend: 53 pruebas, lint y build de producción.
+- [x] Publicar frontend b97877d en Vercel y verificar GitHub/Vercel en verde;
+  observar en Brave la red actualizada y distribuida con 59 documentos.
+- [x] Preparar consolidación Git del backend con respaldo de las ediciones
+  manuales y comprobación de DB/archivos; recibos en export/publish_web_2026_11_24.
+
+## Excluir toda la familia SAF — 24 Nov 2026
+
+- [x] Registrar todas las variantes y compuestos listados, numeraciones 1–14,
+  tipos I–IV, sufijos y las formas compactas adicionales SAFsA/SAFsF.
+- [x] Aplicar regla de familia por sigla completa SAF/SAFs antes de coocurrencias;
+  cubrir alias con canónico traducido, cualquier categoría y futuros sufijos.
+- [x] Verificar 97 pruebas y 698 subpruebas; conservar la opción de lista vacía
+  y no confundir SAF con safe/safety/SAFTA/SAFA.
+- [x] Verificar despliegue AWS: 248 menciones SAF fuera (173 adicionales),
+  total de 6.631 exclusiones y 705 del lote nuevo; sin SAF en los cálculos.
+- [x] Verificar conservación de DB, archivos, clusters y road pavement.
+
+## Reaplicar exclusiones a 59 documentos — 24 Nov 2026
+
+- [x] Auditar toda la lista reiterada por la usuaria, más exclusiones posteriores,
+  sobre los 59 publicados y distinguir el lote nuevo de 11 documentos.
+- [x] Añadir the Amazon, Amazonia (incluye Amazônia por normalización) y
+  peruvian amazon, en cualquier categoría y por nombre completo.
+- [x] Corregir el filtro para excluir también la forma literal de la mención:
+  75 SAF/SAFs habían quedado bajo el canónico sistemas agroflorestais.
+  Conservar las 83 menciones de SAFs-A/SAFs-F no pedidas como nombres simples.
+- [x] Verificar 95 pruebas y 675 subpruebas de explorador/fuzzy matching.
+- [x] Verificar AWS: 6.458 menciones fuera de cálculos, 553 del lote nuevo;
+  79 canónicos completamente excluidos y uno parcialmente excluido.
+- [x] Comprobar que PostgreSQL, archivos y clusters siguen intactos y que
+  road pavement conserva sus 36 menciones como physical_INFRA.
+
+## Road pavement y exclusión adicional — 24 Nov 2026
+
+- [x] Añadir `new roads` al filtro de exclusión, sin convertirlo en road pavement.
+- [x] Pasar 59 pruebas y 647 subpruebas del explorador.
+- [x] Verificar la exclusión adicional en AWS y la preservación de los datos.
+- [x] Unificar 11 canónicos/36 menciones bajo road pavement/physical_INFRA,
+  según la corrección explícita de categoría de la usuaria; mantener las
+  exclusiones previas, incluido new roads.
+- [x] Respaldar y aplicar el mismo plan reversible en PostgreSQL AWS/Mac,
+  preservando textos, categorías anteriores en auditoría y clusters.
+- [x] Registrar 11 alias nuevos y la regla futura deterministic-v4-roads,
+  con prioridad sobre alias de personas incluso si NER etiqueta road como CHAR.
+- [x] Verificar API pública: una sola entidad physical_INFRA con 36 menciones;
+  pasar 93 pruebas y 667 subpruebas de fuzzy matching/explorador.
+
+## Siete exclusiones seleccionadas — 24 Nov 2026
+
+- [x] Añadir pilot plots, plots 5 and 6, road construction,
+  Leticia-Tarapaca road, new road, Transamazonica Road Region y roads
+  al filtro por nombre completo; conservar road y new roads.
+- [x] Verificar 59 pruebas y 646 subpruebas del explorador.
+- [x] Verificar despliegue AWS, siete canónicos/87 menciones excluidos y
+  preservación completa de PostgreSQL, archivos y clusters históricos.
+
+## Exclusión de plot — 24 Nov 2026
+
+- [x] Buscar plot/plots y sus formas compuestas en los 59 documentos actuales:
+  dos canónicos LOC genéricos, 76 menciones en total.
+- [x] Añadir plot por nombre completo y la variante nominal plots al filtro,
+  conservando compuestos y actividades hasta decisión explícita de la usuaria.
+- [x] Verificar 59 pruebas y 629 subpruebas del explorador.
+- [x] Verificar la aplicación en AWS y preservación completa de DB/archivos/clusters:
+  LOC pasa de 430 a 428 nodos y de 1.417 a 1.399 aristas, sin cambios de datos.
+- [ ] Revisar con la usuaria las formas compuestas y los términos cercanos;
+  no inferir equivalencia entre parcela, finca, campo y chacra.
+
+## Fuzzy matching de los 11 NER nuevos — 24 Nov 2026
+
+- [x] Comprobar KAS en las redes antes de procesar y preservar ATT/KNOW/SKILL
+  como categorías originales en PostgreSQL y los JSON.
+- [x] Respaldar AWS y procesar únicamente los 11 documentos con el servicio
+  existente, en una transacción externa con savepoints.
+- [x] Validar 5.602 menciones originales, integridad de las filas previas,
+  archivos, otros documentos y tablas de clusters.
+- [x] Copiar las filas resueltas a la Mac conservando UUID, fechas y detalles;
+  verificar las huellas completas y proteger los 59 documentos publicados.
+- [x] Verificar la API pública con 59 documentos y KAS; pasar 89 pruebas y
+  618 subpruebas de fuzzy matching y explorador.
+- [ ] Retomar el vocabulario controlado sobre el corpus actualizado de 59
+  documentos; acordar equivalencias editoriales con la usuaria.
+
+## Publicación selectiva de NER — 24 Nov 2026
+
+- [x] Identificar los 11 JSON nuevos (10 es, 1 pt) y validarlos contra sus
+  fuentes inglesas actuales, con 5.602 menciones.
+- [x] Alinear los offsets/contextos de f9cbfc22 sobre las correcciones de espacios,
+  preservando sus 31 menciones y categorías; respaldar su JSON previo.
+- [x] Respaldar PostgreSQL y archivos de destino, publicar los 11 NER y las tres
+  correcciones de fuente y registrar english → ner únicamente en esos documentos.
+- [x] Corregir el estado local de 7503f699 y verificar igualdad de archivos/estados
+  Mac/AWS, preservación de los 48 publicados, traducciones y clusters.
+- [x] Incorporar estos 11 NER a las redes mediante fuzzy matching por instrucción
+  posterior de la usuaria; la revisión editorial del vocabulario sigue pendiente.
+- [ ] Antes de regenerar f9cbfc22, alinear también sus entradas históricas de
+  segmentación/anotación; conservar como referencia el JSON publicado y su recibo.
+
 ## Unificación KAS en las redes actuales — 23 Nov 2026
 
 - [x] Agrupar ATT/KNOW/SKILL en KAS antes de filtrar y calcular la red;
@@ -45,8 +149,8 @@
   añadir regresión que rechaza cleaned antes de acceder al proveedor.
 - [x] Proteger los 48 UUID en el generador GLM y corregir la memoria operativa
   para conservar english y no vaciar la carpeta NER.
-- [ ] Publicar los NER v2 terminados de manera selectiva cuando corresponda;
-  conservar las fuentes inglesas y las versiones de clusters ya calculadas.
+- [x] Publicar los 11 NER terminados el 24 Nov de forma selectiva, conservando
+  las fuentes inglesas y las versiones de clusters ya calculadas.
 
 ## Tres metaredes — 20 Nov 2026 (en espera por decisión del 23 Nov)
 
@@ -96,8 +200,8 @@
   en `PROJECT_CONTEXT.md` y `export/sync_review_2026_11_20/review.json`.
 - [x] Conservar los 48 Agroforestry en fuzzyMatching y las dos ejecuciones de
   metaredes de AWS también en la Mac; recuperar english sin retroceder avances.
-- [ ] Preparar la publicación selectiva de los nuevos NER por documento;
-  no reemplazar la base ni copiar estados locales de reinicio a AWS.
+- [x] Publicar selectivamente los 11 NER nuevos el 24 Nov, sin reemplazar la
+  base ni copiar estados locales de reinicio a AWS.
 - [ ] Publicar cuando corresponda la corrección de `57ebcb2a` en cleaned/english
   (retirada de `》 `), con respaldo y coincidencia de fuentes para su futuro NER.
 - [ ] Continuar la auditoría de los NER v2 vigentes y publicarlos en AWS cuando

@@ -6,17 +6,331 @@ Este documento resume el estado metodológico y técnico del proyecto de clasifi
 
 El proyecto transforma documentos de los incubadores en una base de entidades canónicas y redes semánticas auditables. La unidad de evidencia es la oración: las relaciones entre entidades se derivan de su coocurrencia dentro de `(document_id, sentence_id)` y deben poder rastrearse hasta el documento, la oración, el contexto y las entidades originales.
 
-La fase actual, confirmada el 23 Nov, es trabajar únicamente con las redes
-actuales de entidades de los 48 documentos publicados, empezando por exclusiones
-de nodos del explorador. La usuaria confirmó terminada la revisión del nuevo NER;
-su publicación queda pendiente. Los clusters y las metaredes existentes quedan
-en espera y se conservan intactos. Continúa pendiente diseñar el vocabulario
+La fase actual trabaja con las redes de **59 documentos publicados**. Las
+exclusiones y KAS ya están desplegados. El 24 Nov se sincronizaron 11 JSON NER
+nuevos y, por instrucción posterior de la usuaria, se procesó fuzzy matching
+antes de retomar el vocabulario controlado. Mac y AWS conservan los mismos
+UUID y datos resueltos. Los clusters y las metaredes existentes, calculados
+sobre los 48 documentos anteriores, quedan en espera y se conservan intactos.
+Continúa pendiente diseñar el vocabulario
 controlado y aplicar acuerdos al endpoint `fuzzy-matching`. El codebook operativo
 está en `data/codebooks/codebook_en_construccion_en.md`. Sus diez categorías,
 fichas y reglas de anotación están desarrolladas en el borrador 0.4.
 El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
+
+### Publicación web y consolidación de código — 24 Nov 2026
+
+Frontend publicado en Vercel desde `b97877d64c1fb1bcc6e85111c561725a804683b5`
+(`fix(graph): recuperar la distribución de redes colapsadas`). Se incluyen
+dos cambios que estaban pendientes en src/graph: nuevas posiciones iniciales
+distribuidas usando solo anclas de la red anterior y recuperación de cachés
+colapsadas; descarta coordenadas no finitas. Pasaron **53 pruebas, lint y build**
+con Node 24. GitHub check y Vercel terminaron en success, despliegue
+`8trhonrDGaE5eT4QPbRVLDJHU65Y`.
+
+Se comprobó en Brave la web pública con los datos actuales: 59 documentos,
+400 nodos seleccionados, 3.323 enlaces, 3.580 nodos conectados en el corpus
+y 22.106 menciones después de excluir; el mapa se distribuye sin el colapso
+vertical anterior. La página sirve `assets/index-CfQ2yqEi.js`, igual al build
+local de producción. URL: `https://semantic-network-explorer.vercel.app/`.
+
+Backend validado con la suite completa: **216 pruebas y 711 subpruebas**.
+Esta consolidación versiona las exclusiones, resolución road pavement y
+documentación de publicación/fuzzy matching de los 11 nuevos. Las cinco
+fuentes de runtime ya coinciden byte por byte entre Mac y la API de AWS.
+Para asociarlas al commit probado se respalda el árbol manual del EC2 y
+se avanza Git por fast-forward, verificando hashes y preservación completa;
+no hace falta reinstalar dependencias ni reemplazar DB o archivos. Se pausa
+solo el temporizador automático durante esta coordinación y se restablece
+al terminar. Estado y recibos de la publicación:
+`export/publish_web_2026_11_24/` y, en EC2, `export/publish-web-20261124/`.
+El recibo final contiene los SHA y resultados de sincronización.
+
+### Exclusión completa de la familia SAF — 24 Nov 2026
+
+Después de revisar todas las variantes, la usuaria pidió que **todas** salieran
+de la red, incluidos sufijos, numeraciones, tipos y actividades/compuestos.
+**Aplicado en AWS y en el código local.** La política tiene ahora 119 nombres
+normalizados y una regla explícita de familia SAF/SAFs: se reconoce la sigla
+completa dentro de nombres canónicos o textos literales, con sufijos y
+compuestos; también las formas compactas SAFsA/SAFsF encontradas después.
+No se confunden safe/safety/safeguards/SAFTA/SAFA. La expansión de familia se
+activa cuando la lista nominal contiene SAF/SAFs; una lista vacía sigue
+desactivando la exclusión por nombres. El resto de exclusiones continúa por
+nombre completo. Se mantienen todas las decisiones anteriores.
+
+Catálogo y regla en `src/controlled_vocabulary.py`, aplicados mediante
+`exclude_entities` antes de coocurrencias y métricas. El inventario inicial
+mostraba 246 menciones y luego se detectaron SAFsA y SAFsF (una cada una),
+para **248 menciones SAF** en total, **172 del lote nuevo**. Las 75 SAF/SAFs
+simples ya estaban fuera; se retiraron **173 adicionales**. Ya no quedan
+las 83 SAFs-A/SAFs-F bajo el canónico traducido sistemas agroflorestais: sus
+158 menciones completas quedan excluidas. También quedan fuera SAF-dendê,
+SAFs-A variant, SAF 1–14, SAF type I–IV y todos los compuestos listados.
+La regla de sigla cubre futuros sufijos/compuestos con el token SAF/SAFs.
+
+Total vigente sobre 59 documentos: **6.631 menciones excluidas**, **705 del
+lote de 11 nuevos**; **116 canónicos completamente fuera**, sin exclusiones
+parciales en este corpus. Red completa de recurrencia 1/sin top-n:
+3.616 nodos/14.102 aristas antes y **3.580 nodos/13.846 aristas después**.
+Se verificaron las redes completa y de los 11 nuevos, compare y conservación
+de road pavement (36 menciones/physical_INFRA). Auditorías Mac/AWS coinciden;
+las huellas completas de ocho tablas y todos los archivos NER/english/cleaned
+son iguales antes/después. No se borraron ni cambiaron menciones en PostgreSQL,
+no se tocaron fuentes y no se recalcularon clusters. Pasaron **97 pruebas y
+698 subpruebas**. Sin commit nuevo ni cambios de frontend.
+
+Evidencia: `export/saf_variants_2026_11_24/inventory.json` y
+`export/exclude_all_saf_2026_11_24/` (local-audit.json, requested-names.json,
+aws-result.json, public-network.json). SSM exitoso:
+`de562749-5d2a-4c1f-b97d-9a54351e1240`. Respaldo remoto:
+`export/exclude-all-saf-20261124/`; imagen anterior:
+`semanticclassification-api:before-exclude-all-saf-20261124`.
+
+### Revisión previa de exclusiones para 59 documentos — 24 Nov 2026
+
+Los totales de esta revisión anterior quedaron sustituidos por la exclusión
+completa de la familia SAF descrita arriba.
+
+La usuaria reiteró la lista completa del 23 Nov para que también cubra los 11
+documentos nuevos y añadió **the Amazon, Amazonia y peruvian amazon**. Se
+mantienen todas las exclusiones posteriores de plot/plots, pilot plots,
+plots 5 and 6 y seis nombres road; municipios solo cuando indique nombres
+concretos. La política contiene ahora 83 nombres normalizados, siempre por
+nombre completo y en cualquier categoría. Incluye variantes de formato,
+tildes, puntuación y las equivalencias nominales explícitas ya definidas.
+Amazonia cubre Amazônia y Amazonía por normalización. Los tres nombres nuevos
+corresponden a 1.206 menciones (the Amazon 903, Peruvian Amazon 207 y Amazônia 96).
+
+La auditoría detectó que el filtro anterior por canónico dejaba pasar 75
+menciones literales SAF/SAFs, de ellas 20 de los documentos nuevos, porque
+fuzzy matching las había vinculado a `sistemas agroflorestais` (UUID
+`78e0aa9e-2c0f-4591-9e36-0bb7d55637ec`). Se corrigió `exclude_entities`
+para comprobar además el texto literal completo de cada mención **antes de
+coocurrencias y métricas**. Cuando solo la forma literal está excluida se
+quitan esas menciones, sin descartar otras formas del mismo canónico. En este
+caso permanecen 83 menciones de SAFs-A/SAFs-F, no incluidas en la lista de
+nombres simples. Si se excluye el canónico por nombre o UUID se siguen
+retirando todas sus menciones. La lista explícita vacía desactiva la exclusión
+nominal como antes. La respuesta describe exclusiones parciales con `partial`
+y `remaining_mention_count`; el frontend actual es compatible y no se modificó.
+
+**Aplicado y verificado en AWS y en el código local:** 6.458 menciones se
+retiran del cálculo sobre 59 documentos; 553 corresponden al lote nuevo de
+11. Se excluyen completamente 79 canónicos y parcialmente uno. La red
+completa de recurrencia 1/sin top-n pasó de 3.634 nodos/14.570 aristas a
+3.616 nodos/14.102 aristas. Se comprobaron tanto la red completa como la
+proyección exclusiva de los 11 nuevos y el endpoint compare. Road pavement
+conserva 36 menciones/physical_INFRA. Las huellas completas de ocho tablas y
+todos los archivos NER/english/cleaned permanecen intactas; auditorías Mac/AWS
+coinciden. No se escribieron datos ni se recalcularon clusters históricos.
+Pasaron 95 pruebas y 675 subpruebas. Sin commit nuevo.
+
+Evidencia: `export/exclusions_59_2026_11_24/` (local-audit-before.json,
+local-audit.json, requested-names.json, aws-result.json y public-network.json).
+SSM exitoso: `fbf52f77-ba04-4759-9d3e-86df6d2aedba`.
+Respaldo remoto: `export/exclusions-59-20261124/`; imagen anterior:
+`semanticclassification-api:before-exclusions-59-20261124`.
+Este filtro global cubre futuros documentos aunque sus canónicos tengan UUID
+nuevos; no hay que reejecutar NER/fuzzy matching ni borrar filas para aplicarlo.
+
+### Road pavement y exclusiones — 24 Nov 2026
+
+La usuaria pidió agrupar los términos que contienen la palabra road bajo
+`road pavement` y luego precisó que **new roads debe excluirse**, sin entrar
+en esa unificación. La exclusión adicional de `new roads` ya está aplicada en
+Mac y AWS: un canónico physical_INFRA, UUID
+`52cba12b-e08f-44cf-9152-56bd34722652`, una mención. La red completa de
+59 documentos/recurrencia 1/sin top-n pasó de 3.645 nodos y 14.582 aristas a
+3.644 nodos y 14.579 aristas. Todas las huellas de DB, archivos y clusters
+siguen iguales. Pasaron 59 pruebas y 647 subpruebas. API saludable, despliegue
+mínimo sin modificar dependencias, sin commit nuevo.
+Evidencia: `export/exclude_new_roads_2026_11_24/deployment-result.json`.
+SSM exitoso: `57c75d36-5f35-45a2-8243-18e61f9c6422`.
+
+**Canonicalización completada en AWS y Mac.** La usuaria corrigió explícitamente
+que road pavement siempre debe ser **physical_INFRA**, nunca PRAC. Se mantuvieron
+las exclusiones anteriores, incluido new roads. Se reunieron 36 menciones de
+11 canónicos en el UUID existente `9631fd97-54b5-47f1-a3af-9832dcb1da21`,
+nombre `road pavement`, ahora categoría `physical_INFRA`. Los diez canónicos
+anteriores sin menciones activas se conservaron para trazabilidad y referencias
+históricas. El destino tenía originalmente una sola mención PRAC y no había
+referencias de estos once canónicos fuera del corpus publicado Agroforestry.
+
+Se actualizaron exclusivamente canonical_id, categoría y metadatos de resolución
+de esas 36 filas de entities, la categoría del canónico destino y 11 alias nuevos
+(sin borrar ni modificar los alias anteriores). El texto, offsets, contexto,
+oración, UUID de mención, documento, ambigüedad y fechas permanecen iguales.
+Las categorías anteriores eran 26 physical_INFRA, 6 LOC y 4 PRAC: se guardaron
+en `entities.resolution_details.source_category`, junto al canónico original y
+los metadatos completos de la resolución anterior bajo editorial_canonicalization.
+La evidencia de la API expone categoría resuelta physical_INFRA y source_category
+original. No se modificaron los JSON NER ni fuentes english/cleaned. Documentos,
+oraciones, clusters y todas las filas ajenas al cambio conservan sus huellas.
+
+Regla editorial persistente en `src/controlled_vocabulary.py`; fuzzy matching
+pasa a `deterministic-v4-roads`. Los tokens completos road/roads se resuelven
+como road pavement/physical_INFRA independientemente de la categoría NER,
+exceptuando los seis nombres road ya excluidos para evitar reincorporarlos.
+La regla prevalece sobre detección de alias de personas. Roadmap, railroads,
+broad y broadcast son palabras distintas y no se agrupan. Las exclusiones
+road se comparten con el explorador desde el módulo de vocabulario.
+
+En AWS la red completa pasó de 3.644 nodos/14.579 aristas a
+3.634 nodos/14.570 aristas, y la API pública confirma una única entidad
+road pavement física con 36 menciones; no aparece en la red PRAC. Mac importó
+exactamente el mismo plan y las huellas de cuatro tablas coinciden. Se respaldaron
+ambas bases; no se hicieron migraciones ni cambios de frontend. Pasaron 93 pruebas
+y 667 subpruebas. Fuentes modificadas sin commit nuevo.
+Evidencia: `export/road_pavement_2026_11_24/` (plan.json, aws-result.json,
+local-result.json, guard-result.json, public-physical-network.json).
+SSM principal `59ff5602-6293-4050-b00e-9be0a6134a8f`; ajuste de prioridad
+`d4ecfcb5-aebc-418d-8830-4e524585b163`. Respaldo remoto
+`export/road-pavement-20261124/database-before.dump`; local
+`export/road_pavement_2026_11_24/local-before.dump`.
+
+### Siete exclusiones seleccionadas — 24 Nov 2026
+
+Desplegados en AWS y aplicados al filtro local: `pilot plots`, `plots 5 and 6`,
+`road construction`, `Leticia-Tarapaca road`, `new road`,
+`Transamazonica Road Region` y `roads`. Se excluyen por nombre completo, en
+cualquier categoría y antes de calcular coocurrencias y métricas. Son siete
+canónicos con 87 menciones: 1, 2, 4, 1, 1, 1 y 77 respectivamente. No se añadió
+una equivalencia roads→road: `road` y `new roads` siguen permitidos, así como
+los demás compuestos no seleccionados. La normalización nominal ya existente
+de plots→plot también cubre `pilot plot`.
+
+Con 59 documentos, recurrencia 1, todas las categorías y sin top-n, la red
+conectada pasó de 3.650 nodos/14.670 aristas a 3.645 nodos/14.582 aristas;
+no todos los canónicos excluidos estaban conectados en esa proyección.
+Las huellas completas de ocho tablas y los archivos NER/english/cleaned
+permanecen iguales: no se modificaron datos ni clusters históricos.
+Pasaron 59 pruebas y 646 subpruebas. API saludable. Imagen mínima basada en la
+API anterior, copiando solo explorer.py, sin reinstalar dependencias.
+Sin commit nuevo. Evidencia: `export/exclude_selected_2026_11_24/`,
+`selected-inventory.json` y `deployment-result.json`.
+SSM exitoso: `c28d3ce3-a224-43ac-bbb1-02ac4bba8467`.
+Respaldo remoto: `export/exclude-selected-20261124/`; imagen anterior:
+`semanticclassification-api:before-selected-exclusions-20261124`.
+
+### Exclusión de plot — 24 Nov 2026
+
+Por instrucción de la usuaria se excluyeron los nombres completos `plot` y
+`plots`, incluyendo mayúsculas y puntuación normalizadas, antes de construir
+coocurrencias y calcular métricas del explorador. Son dos canónicos LOC:
+`cb3f3725-3fd0-4429-9d80-4a674e59a386` (31 menciones) y
+`fc92cf1a-cad4-4ae0-b56c-8d12f8f19fa5` (45 menciones).
+La red solo LOC, 59 documentos, recurrencia 1 y sin top-n pasó de 430 nodos y
+1.417 aristas a 428 nodos y 1.399 aristas. Se comprobaron las huellas completas
+de ocho tablas y todos los archivos NER/english/cleaned antes y después:
+PostgreSQL, fuentes y clusters permanecen intactos. Pasaron 59 pruebas y
+629 subpruebas. Los 21 nombres compuestos distintos quedan pendientes de
+decisión explícita: no hay exclusión por subcadena ni equivalencias nuevas
+entre plot, field, farm y chacra.
+
+Código actualizado en Mac y AWS; sin commit nuevo. El primer build remoto
+agotó el disco al reinstalar dependencias y su rollback dejó el archivo fuente
+vacío; la API anterior siguió saludable. Se restauró el respaldo y se completó
+un build mínimo basado en `semanticclassification-api:before-plot-exclusion-20261124`,
+copiando únicamente `/app/src/analysis/explorer.py`, sin cambiar dependencias.
+No se borraron imágenes, caché ni datos. El disco quedó con aproximadamente
+1,2 GB libres antes de esa recuperación: revisar capacidad antes de otro build
+completo. SSM exitoso: `13937566-2423-4b02-9f99-4781fa4d56cf`.
+Evidencia y candidatos: `export/exclude_plot_2026_11_24/`, especialmente
+`deployment-result.json`, `inventory.json` y `compound_candidates.json`.
+Respaldo remoto: `export/exclude-plot-20261124/`.
+
+### Fuzzy matching de los 11 NER nuevos — 24 Nov 2026
+
+**Completado en AWS y sincronizado en la Mac.** El corpus Agroforestry queda
+en ambas bases con **59 fuzzyMatching, 55 english y 1 cleaned**, sin documentos
+de este lote pendientes en ner. Se ejecutó el servicio existente
+`DocumentService.preparar_fuzzy_matching`, versión `deterministic-v3`, únicamente
+para los 11 UUID del manifiesto de publicación; los 48 anteriores no se reprocesaron.
+
+Resultado persistido: **5.602 menciones, 1.900 oraciones, 996 canónicos nuevos
+y 1.030 alias nuevos**. El resto de las menciones se vinculó con canónicos
+existentes conforme a las reglas actuales. Todavía no se aplicaron acuerdos
+editoriales nuevos ni la equivalencia pendiente de TFFF.
+
+Antes de procesar se comprobó que el servidor ya agrupa ATT/KNOW/SKILL en KAS
+para las redes. PostgreSQL conserva exactamente las categorías originales de
+cada mención: en este lote hay **296 ATT, 40 KNOW y 19 SKILL**. La API pública
+devuelve 59 documentos y un único grupo KAS, con **375 canónicos** en todo el
+corpus. Una red de prueba solo KAS de los 11 nuevos, con recurrencia 1 y sin
+top-n, devuelve 147 nodos conectados y 149 aristas; el resto de los canónicos
+puede quedar fuera de esa proyección por falta de enlaces dentro de KAS.
+
+Se respaldó PostgreSQL remoto y se verificó la lectura completa del dump.
+Las llamadas por documento se ejecutaron con savepoints dentro de una única
+transacción externa: los once se confirmaron después de validar el conjunto.
+Se comprobó que ninguna fila previa de entities, sentences, canonical_entities
+o canonical_entity_aliases fue modificada o eliminada. Los nuevos alias pueden
+apuntar a canónicos anteriores, conservando intactas sus filas originales.
+No cambiaron otros datos de documentos, ningún archivo NER/english/cleaned
+ni ninguna de las tres tablas de metaredes.
+
+La copia local importó exclusivamente las filas nuevas de AWS, con los mismos
+UUID, fechas y detalles de resolución, después de respaldar PostgreSQL local.
+Las huellas completas de las cuatro tablas coinciden con AWS después de la
+importación; las huellas de clusters permanecen iguales. El generador local
+protege ahora los **59 UUID publicados** en protected_documents.json.
+
+Pasaron 89 pruebas y 618 subpruebas de fuzzy matching y explorador. Evidencia:
+`export/fuzzy_11_2026_11_24/aws-result.json`, `local-import-result.json`,
+`resolved_snapshot.json.gz`, `public-meta.json` y los scripts de ejecución.
+Respaldo remoto: `export/fuzzy-11-20261124/database-before.dump` bajo el repo
+del EC2. SSM principal: `1fa582ef-cc65-4cf1-a0d8-533071f00692`.
+No se requirieron cambios de aplicación ni un nuevo despliegue Vercel: el
+frontend consulta el corpus actualizado de la API.
+
+### Publicación selectiva de NER: etapa previa — 24 Nov 2026
+
+**11 documentos sincronizados en estado `ner`: 10 de idioma original es y 1 pt,
+con 5.602 menciones en sus JSON.** Se verificaron contra sus fuentes inglesas
+exactas, categorías originales, offsets, contexto de cada mención y ausencia de
+duplicados. Los 11 JSON y las tres fuentes corregidas coinciden byte por byte en
+Mac y AWS. El registro local de `7503f699` aún estaba en english; se alineó a ner
+con su ruta, después de respaldar PostgreSQL local.
+
+Al terminar esta etapa previa había **48 fuzzyMatching, 11 ner, 55 english y
+1 cleaned**. La carga actualizó únicamente status/ner_path de estos documentos;
+el fuzzy matching posterior se describe arriba. Las categorías
+ATT, KNOW y SKILL de los nuevos JSON permanecen conservadas.
+
+Se reemplazaron con respaldo los 11 JSON antiguos que ya existían físicamente
+en AWS, aunque sus documentos tenían ner_path NULL. La carpeta remota sigue
+conteniendo 195 JSON; la presencia de un archivo no equivale a su estado ni a su
+inclusión en el dashboard. No se propagaron borrados locales ni se reemplazó DB.
+
+Fuentes publicadas junto con sus NER:
+- `70584b54`: retirada de XXXXXXXXXXX en cleaned y english y separación de
+  Desde 1990 en cleaned. Su JSON vigente ya correspondía al inglés corregido.
+- `f9cbfc22`: tres separaciones CITE productivo en english. Se ajustaron 23
+  offsets, tres superficies por espacios y sus contextos, conservando las 31
+  menciones, categorías y sentence_id. La alineación se demostró primero sobre
+  el texto anterior exacto de AWS; no hubo reextracción ni cambios semánticos.
+
+Los manifiestos antiguos del generador se conservaron como evidencia histórica;
+varios documentos nuevos no tenían manifiesto en ese directorio. El manifiesto
+de esta publicación valida directamente los JSON vigentes contra la fuente real.
+**No regenerar f9cbfc22 desde sus entradas antiguas de anotación/segmentación sin
+alinearlas antes:** la copia NER publicada es la versión ajustada y verificada.
+
+Se verificó lectura completa del respaldo PostgreSQL remoto de 23.741.820 bytes
+antes de publicar y se guardaron todos los archivos reemplazados. Una transacción
+registró los 11 estados; los recibos prueban que no cambiaron otros documentos,
+archivos ajenos, entidades, canónicos, alias, oraciones ni las tablas de metaredes.
+La API quedó saludable y /meta siguió devolviendo 48 documentos.
+
+Evidencia local: `export/publish_ner_2026_11_24/`, con
+`publication_manifest.json`, `publication-result.json`, `ner_alignment.json`,
+`local_alignment_result.json`, respaldos y scripts. Respaldo remoto:
+`/home/ubuntu/semanticClassification/export/publish-ner-20261124/backup/`.
+SSM de publicación: `2ad5a8ed-5f28-4166-b06e-5878593fba70`.
+La aplicación de producción no requirió cambios de código ni despliegue Vercel.
 
 ### KAS en las redes actuales — 23 Nov 2026
 

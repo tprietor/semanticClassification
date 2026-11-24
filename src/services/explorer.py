@@ -570,6 +570,7 @@ class ExplorerService:
                 Entity.canonical_id,
                 CanonicalEntity.canonical_name,
                 Entity.category,
+                Entity.resolution_details,
                 Entity.text.label("mention_text"),
             )
             .join(
@@ -605,7 +606,9 @@ class ExplorerService:
                 "id": str(row.canonical_id),
                 "name": row.canonical_name,
                 "category": network_category(row.category),
-                "source_category": row.category,
+                "source_category": (getattr(row, "resolution_details", None) or {}).get(
+                    "source_category", row.category
+                ),
                 "mention_text": row.mention_text,
             }
             if entity not in sentence["entities"]:

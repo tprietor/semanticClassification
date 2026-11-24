@@ -7,6 +7,9 @@ from uuid import uuid4
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 
 from src.models.canonical_entities import CanonicalEntity
+from src.controlled_vocabulary import (
+    ROAD_EXCLUDED_ENTITY_NAMES, ROAD_RULE_ID, is_road_pavement_alias,
+)
 from src.services.fuzzy_matching import (
     FuzzyMatchingDataError,
     RESOLUTION_VERSION,
@@ -52,6 +55,44 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
             normalizar_nombre("  RÍO   Madre de Dios "),
             "rio madre de dios",
         )
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_road_variants_share_physical_canonical_and_preserve_evidence(self, read, create):
+        target = canonical("road pavement", "physical_INFRA")
+        read.return_value = [target, canonical("road pavement", "PRAC")]
+        original = [mention("road corridor", "LOC"), mention("road building", "PRAC"),
+                    mention("Road networks", "physical_INFRA"), mention("road pavement", "PRAC"),
+                    mention("Road", "CHAR"), mention("Road Surface", "CHAR")]
+        result, stats = asociar_entidades_canonicas(self.db, original)
+        self.assertEqual({r["canonical_id"] for r in result}, {target.id})
+        self.assertEqual({r["category"] for r in result}, {"physical_INFRA"})
+        self.assertEqual(stats["controlled_alias"], 6)
+        for before, after in zip(original, result, strict=True):
+            for key in ("text", "start", "end", "sentence_id", "context", "ambiguity"):
+                self.assertEqual(before[key], after[key])
+            self.assertEqual(after["resolution_details"]["source_category"], before["category"])
+            self.assertEqual(after["resolution_details"]["rule"], ROAD_RULE_ID)
+        self.assertEqual([m["category"] for m in original], ["LOC", "PRAC", "physical_INFRA", "PRAC", "CHAR", "CHAR"])
+        create.assert_not_called()
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_road_rule_creates_physical_canonical_instead_of_reusing_practice(self, read, create):
+        read.return_value = [canonical("road pavement", "PRAC"), canonical("road pavement maintenance", "physical_INFRA")]
+        target = canonical("road pavement", "physical_INFRA")
+        create.return_value = target
+        result, _ = asociar_entidades_canonicas(self.db, [mention("road pavement", "PRAC")])
+        create.assert_called_once_with(self.db, canonical_name="road pavement", category="physical_INFRA")
+        self.assertEqual(result[0]["canonical_id"], target.id)
+
+    def test_road_rule_respects_exclusions_and_word_boundaries(self):
+        for text in (*ROAD_EXCLUDED_ENTITY_NAMES, "NEW ROADS.", "new-road", "railroads", "roadmap", "broader social circles", "broadcast sowing"):
+            with self.subTest(text=text):
+                self.assertFalse(is_road_pavement_alias(text))
+        for text in ("road", "ROAD PAVEMENT", "road networks", "rural roads", "road’s surface"):
+            with self.subTest(text=text):
+                self.assertTrue(is_road_pavement_alias(text))
 
     def test_wyss_institution_forms_must_be_char(self) -> None:
         for text in ("Wyss Academy", "WA SAM Hub", "WA Sam Hub"):

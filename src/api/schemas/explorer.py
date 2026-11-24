@@ -280,6 +280,10 @@ class ExplorerExcludedEntity(BaseModel):
     )
     category: str | None
     mention_count: int
+    partial: bool = Field(
+        default=False, description="Solo se quitaron formas literales excluidas de este canónico"
+    )
+    remaining_mention_count: int = 0
 
 
 class ExplorerNetworkResponse(BaseModel):
