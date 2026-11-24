@@ -17,6 +17,26 @@ from src.services import ner
 
 
 class NerProviderValidationTests(unittest.TestCase):
+    def test_brazil_nut_retry_restores_complete_resource_and_keeps_country(self):
+        client = Mock()
+        def respond(**request):
+            corrected = client.messages.create.call_count > 1
+            annotations = [
+                {"label": "LOC", "text": "Brazil", "sentence_id": "s-000000000", "ambiguity": "low"},
+                {"label": "eco_INFRA" if corrected else "LOC",
+                 "text": "Brazil nuts" if corrected else "Brazil",
+                 "sentence_id": "s-000000000", "ambiguity": "low"},
+            ]
+            return SimpleNamespace(stop_reason="tool_use", content=[SimpleNamespace(
+                type="tool_use", name=ner.NER_TOOL_NAME,
+                input={"document_id": "doc", "annotations": annotations})])
+        client.messages.create.side_effect = respond
+        with patch.object(ner, "get_anthropic_client", return_value=client):
+            entities = ner.extraer_entidades("Brazil exports Brazil nuts.", "doc")
+        self.assertEqual(client.messages.create.call_count, 2)
+        self.assertEqual([(e["text"], e["category"], e["start"], e["end"]) for e in entities],
+                         [("Brazil", "LOC", 0, 6), ("Brazil nuts", "eco_INFRA", 15, 26)])
+
     def test_conflicting_spans_are_corrected_before_accepting_chunk(self):
         client = Mock()
         calls = []
@@ -60,6 +80,15 @@ class NerProviderValidationTests(unittest.TestCase):
 
 
 class NerMentionPositionTests(unittest.TestCase):
+    def test_complete_brazil_nut_with_wrong_category_is_rejected(self):
+        issues = []
+        sentences = _segmentar_oraciones("Brazil nut grows here.", 0)
+        entities = _parsear_datos({"document_id": "doc", "annotations": [
+            {"label": "LOC", "text": "Brazil nut", "sentence_id": sentences[0]["sentence_id"], "ambiguity": "low"},
+        ]}, sentences, issues)
+        self.assertEqual(entities, [])
+        self.assertTrue(any("eco_INFRA" in issue for issue in issues))
+
     def test_et_al_citation_does_not_split_sentence(self) -> None:
         text = "Chamberlain et al. [23] studied agroforestry. Farmers participated."
         sentences = _segmentar_oraciones(text, 0)

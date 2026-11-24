@@ -2,6 +2,32 @@
 import re
 import unicodedata
 
+BRAZIL_NUT_CANONICAL_NAME = "Brazil nut"
+BRAZIL_NUT_CANONICAL_CATEGORY = "eco_INFRA"
+BRAZIL_NUT_RULE_ID = "brazil-nut-contextual-span-2026-11-24"
+_BRAZIL_NUT = re.compile(r"(?<!\w)brazi(?:l)?(?:\s+|[‐‑‒–—-]\s*)nuts?(?!\w)", re.IGNORECASE)
+
+
+def is_brazil_nut_name(value: str) -> bool:
+    """Only the complete resource name, never Brazil or harvesting compounds."""
+    return _BRAZIL_NUT.fullmatch(value.strip()) is not None
+
+
+def brazil_nut_span(text: str, start: int, end: int) -> tuple[int, int] | None:
+    """Complete an anchored Brazi/Brazil span only when the source says nut(s).
+
+    The exact occurrence matters: the same sentence can mention the country
+    and its nut. Never infer the resource merely from nearby words.
+    """
+    if not 0 <= start < end <= len(text):
+        return None
+    match = _BRAZIL_NUT.match(text, start)
+    if match is None:
+        return None
+    if (start, end) == match.span() or text[start:end].casefold() in {"brazi", "brazil"}:
+        return match.span()
+    return None
+
 # All SAF/SAFs variants and compounds were explicitly excluded on Nov 24.
 # Keep the observed labels reviewable and recognize the acronym as a whole
 # token so future suffixes are covered without matching safe/safety/SAFTA.

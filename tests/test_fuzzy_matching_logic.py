@@ -1,4 +1,5 @@
 import os
+import copy
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -8,6 +9,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 
 from src.models.canonical_entities import CanonicalEntity
 from src.controlled_vocabulary import (
+    BRAZIL_NUT_RULE_ID,
     ROAD_EXCLUDED_ENTITY_NAMES, ROAD_RULE_ID, is_road_pavement_alias,
 )
 from src.services.fuzzy_matching import (
@@ -55,6 +57,63 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
             normalizar_nombre("  RÍO   Madre de Dios "),
             "rio madre de dios",
         )
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_brazil_nut_repairs_exact_occurrence_and_preserves_country_and_source(self, read, create):
+        country, resource = canonical("Brazil", "LOC"), canonical("Brazil nut", "eco_INFRA")
+        read.return_value = [country, resource]
+        text = "Brazil exports Brazil nuts."
+        source = [dict(mention("Brazil", "LOC"), start=100, end=106,
+                       sentence_id="s-000000100", context=text),
+                  dict(mention("Brazil", "LOC"), start=115, end=121,
+                       sentence_id="s-000000100", context=text)]
+        before = copy.deepcopy(source)
+        result, _ = asociar_entidades_canonicas(self.db, source)
+        self.assertEqual(source, before)
+        self.assertEqual((result[0]["canonical_id"], result[0]["category"]), (country.id, "LOC"))
+        nut = result[1]
+        self.assertEqual((nut["text"], nut["start"], nut["end"]), ("Brazil nuts", 115, 126))
+        self.assertEqual((nut["canonical_id"], nut["category"]), (resource.id, "eco_INFRA"))
+        self.assertEqual(nut["resolution_details"]["source_mention"], before[1])
+        self.assertEqual(nut["resolution_details"]["rule"], BRAZIL_NUT_RULE_ID)
+        # A country alias must never be added to the resource's dictionary.
+        resource_aliases = [call.kwargs["alias_text"] for call in self.aliases_register.call_args_list
+                            if call.kwargs["canonical_id"] == resource.id]
+        self.assertEqual(resource_aliases, ["Brazil nuts"])
+        create.assert_not_called()
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_complete_nut_variants_force_eco_without_fuzzy_reusing_longer_names(self, read, create):
+        read.return_value = [canonical("Brazil nuts", "PRAC"), canonical("Brazil nut forests", "eco_INFRA")]
+        resource = canonical("Brazil nut", "eco_INFRA")
+        create.return_value = resource
+        result, stats = asociar_entidades_canonicas(self.db, [
+            mention("Brazil nut", "LOC"), mention("Brazil Nuts", "PRAC"), mention("Brazil-nut", "CHAR"),
+        ])
+        self.assertEqual({r["canonical_id"] for r in result}, {resource.id})
+        self.assertEqual({r["category"] for r in result}, {"eco_INFRA"})
+        self.assertEqual(stats["controlled_alias"], 3)
+        create.assert_called_once_with(self.db, canonical_name="Brazil nut", category="eco_INFRA")
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_brazil_nut_repair_rejects_overlapping_annotations(self, read):
+        source = [dict(mention("Brazil", "LOC"), context="Brazil nuts"),
+                  dict(mention("nuts", "eco_INFRA"), start=7, end=11, context="Brazil nuts")]
+        with self.assertRaisesRegex(FuzzyMatchingDataError, "superpuesta"):
+            asociar_entidades_canonicas(self.db, source)
+        read.assert_not_called()
+
+    def test_brazil_nut_requires_anchored_source_and_leaves_compounds_unchanged(self):
+        from src.services.fuzzy_matching import _completar_brazil_nut, _planear_menciones
+        source = [dict(mention("Brazil", "LOC"), context="Brazil and Brazil nuts"),
+                  dict(mention("Brazil", "LOC"), context="Brazil nuts", start=5, end=11),
+                  dict(mention("Brazil", "LOC"), context="Brazil nuts", sentence_id="unknown"),
+                  mention("Brazil nut harvesting", "PRAC"),
+                  mention("Brazil nut gatherers", "CHAR")]
+        self.assertEqual(_completar_brazil_nut(source), source)
+        self.assertTrue(all(p.strategy == "standard" for p in _planear_menciones(source)))
 
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")

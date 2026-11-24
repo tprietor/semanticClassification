@@ -1,5 +1,18 @@
 # Tareas
 
+## Brazil nut: extracción completa y eco_INFRA — 24 Nov 2026
+
+- [x] Auditar 611 menciones Brazil/LOC, verificar offsets y distinguir 118
+  spans Brazil nut(s) en ocho documentos de las 493 menciones restantes.
+- [x] Corregir esas 118 filas en Mac y AWS con el mismo UUID eco_INFRA,
+  respaldo validado, plan reversible y anotación original en resolution_details.
+- [x] Añadir regla contextual en fuzzy matching v5 y controles en NER;
+  verificar 225 pruebas y 728 subpruebas, preservando país y compuestos.
+- [x] Verificar exclusiones, JSON, traducciones, documentos y clusters;
+  observar en Vercel Brazil nut/eco_INFRA con 118 menciones y ocho documentos.
+- [x] Preparar sincronización Git del cambio probado y publicado; recibos
+  en export/brazil_nut_2026_11_24.
+
 ## Exclusiones limitadas a LOC — 24 Nov 2026
 
 - [x] Incluir todos los lugares pedidos, más Madre de Dios River; verificar

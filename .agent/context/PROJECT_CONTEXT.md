@@ -20,6 +20,46 @@ El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### Brazil nut: corregir el span y la categoría — 24 Nov 2026
+
+La usuaria pidió corregir Brazi/Brazil cuando la extracción era un fragmento
+de **Brazil nut**, clasificando el recurso como **eco_INFRA**. El inventario
+de 59 documentos no encontró Brazi aislado, pero sí 611 menciones Brazil/LOC.
+La posición exacta en cada oración confirmó **118 extracciones truncadas en
+ocho documentos** (100 singulares y 18 plurales). Las otras **493 menciones
+Brazil** se conservan: la regla no transforma el país ni busca por proximidad.
+
+Se reutiliza el UUID eco_INFRA existente
+`7eee4df6-f9a3-4473-b2e5-573395b9e2b3`, nombre **Brazil nut**. En PostgreSQL se
+actualizan texto literal, final del span, categoría y resolución de las 118
+menciones, conservando sus UUID, inicio, documento, oración, contexto y fecha.
+`resolution_details.source_mention` conserva la anotación original;
+`editorial_correction` registra el canónico y resolución anteriores. Se añade
+un alias completo Brazil nuts; nunca se registra Brazil/Brazi como alias
+global del recurso. Los JSON originales y traducciones permanecen intactos.
+
+El prompt NER y su validador exigen el término completo y eco_INFRA, solicitando
+corrección al proveedor cuando extrae solo Brazil o etiqueta mal el recurso.
+Fuzzy matching **deterministic-v5-brazil-nut** completa JSON históricos solo
+si el span, offsets y contexto coinciden exactamente y no hay solapamientos;
+la resolución preserva el original sin editar el JSON. Las formas completas
+singular/plural/con guion van al mismo canónico eco_INFRA. Los compuestos de
+prácticas o actores conservan su clasificación propia.
+
+Mac y AWS aplicaron el mismo plan reversible tras respaldos PostgreSQL
+validados. Se verificaron todas las filas ajenas a la corrección, documentos,
+oraciones, clusters y archivos fuente. Las exclusiones anteriores siguen
+retirando 7.863 menciones. La red completa pasa de 3.522 nodos/12.945 aristas a
+**3.523 nodos/12.961 aristas**, con las métricas recalculadas. Pasaron **225
+pruebas y 728 subpruebas** del backend.
+
+La web pública en Vercel se comprobó en Brave: Brazil nut aparece como
+**Ecological infrastructure eco_INFRA · 118 mentions · 8 docs**, con 117
+conexiones y posición 12 de influencia. El frontend b97877d sigue publicado
+correctamente; los datos actualizados llegan desde AWS sin cambios de interfaz.
+Auditoría, plan reversible y recibos: `export/brazil_nut_2026_11_24/`; respaldo
+remoto: `export/brazil-nut-20261124/`.
+
 ### Exclusiones limitadas a LOC — 24 Nov 2026
 
 La usuaria pidió retirar de LOC Km 6, Tambopata, western Amazon, Amazon River,

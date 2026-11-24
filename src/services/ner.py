@@ -7,6 +7,7 @@ from typing import Any
 
 from src.categories import ACTIVE_CATEGORIES
 from src.config import settings
+from src.controlled_vocabulary import BRAZIL_NUT_CANONICAL_CATEGORY, brazil_nut_span
 from src.services.llm_client import get_anthropic_client
 
 logger = logging.getLogger(__name__)
@@ -326,6 +327,16 @@ def _parsear_datos(
             continue
 
         start_rel, end_rel = offset_result
+        resource_span = brazil_nut_span(sentence["text"], start_rel, end_rel)
+        if resource_span is not None and (
+            resource_span != offset_result or label != BRAZIL_NUT_CANONICAL_CATEGORY
+        ):
+            report(
+                "En %s, extrae el término completo %r como eco_INFRA; "
+                "Brazil dentro de Brazil nut(s) no es un país. Conserva LOC para el país independiente",
+                sentence_id, sentence["text"][resource_span[0]:resource_span[1]],
+            )
+            continue
         used_ranges[sentence_id].append((start_rel, end_rel, label))
 
         ambiguity = anot.get("ambiguity", "low")

@@ -10,6 +10,8 @@ Specific PRAC rule: when “agroforestry”, “agroforestería” (also “agro
 
 Confirmed category examples: “Wyss Academy” and “WA SAM Hub” are CHAR, including when a sentence mentions their area of work; “agroforestry systems” is PRAC, never LOC. Resolve shorter acronyms such as “WA” from context.
 
+Brazil nut rule: when the source names the nut or biological resource, extract the complete literal “Brazil nut” or “Brazil nuts” (preserving original case, spelling and hyphens) as eco_INFRA. Never extract the embedded “Brazil” or “Brazi” as LOC. A separate reference to the country Brazil remains LOC, even if Brazil nuts occur elsewhere in the same sentence. Longer expressions such as “Brazil nut harvesting” describe a practice and remain PRAC; do not add an overlapping location inside them.
+
 <codebook>
 $codebook
 </codebook>

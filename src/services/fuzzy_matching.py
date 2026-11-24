@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from src.categories import LEGACY_CATEGORY_ALIASES, STORED_CATEGORIES
 from src.controlled_vocabulary import (
+    BRAZIL_NUT_CANONICAL_CATEGORY, BRAZIL_NUT_CANONICAL_NAME, BRAZIL_NUT_RULE_ID,
+    brazil_nut_span, is_brazil_nut_name,
     ROAD_CANONICAL_CATEGORY, ROAD_CANONICAL_NAME, ROAD_RULE_ID,
     is_road_pavement_alias,
 )
@@ -21,7 +23,7 @@ from src.models.canonical_entity_aliases_repo import CanonicalEntityAliasRepo
 # La extracción admite solo las diez activas; los JSON históricos pueden
 # conservar INFRA hasta su reclasificación contextual.
 VALID_CATEGORIES = STORED_CATEGORIES
-RESOLUTION_VERSION = "deterministic-v4-roads"
+RESOLUTION_VERSION = "deterministic-v5-brazil-nut"
 FUZZY_THRESHOLDS = {
     **dict.fromkeys(VALID_CATEGORIES, 96.0),
     "CHAR": 93.0,
@@ -376,6 +378,7 @@ def asociar_entidades_canonicas(
             mencion["category"] = legacy_category
         _validar_mencion(mencion, index)
 
+    menciones = _completar_brazil_nut(menciones)
     source_document_id = _normalizar_document_id(document_id)
     canonicas = CanonicalEntityRepo.leer_todas(db)
     aliases = CanonicalEntityAliasRepo.leer_todos(db)
@@ -432,6 +435,7 @@ def asociar_entidades_canonicas(
             **plan.details,
         }
         mencion_asociada = dict(mencion)
+        mencion_asociada.pop("_brazil_nut_source_mention", None)
         if plan.canonical_category is not None:
             mencion_asociada["category"] = decision.canonical_entity.category
         mencion_asociada["canonical_id"] = decision.canonical_entity.id
@@ -484,10 +488,59 @@ def _indexar_aliases(
     return indice
 
 
+def _completar_brazil_nut(menciones: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Repair legacy truncated spans from their exact sentence position.
+
+    Keep the input JSON untouched and carry the original annotation into the
+    persisted resolution audit. No bare Brazil/Brazi alias is ever registered.
+    """
+    result = []
+    for mention in menciones:
+        context = mention.get("context")
+        sid = re.fullmatch(r"s-(\d+)", str(mention.get("sentence_id", "")))
+        if not isinstance(context, str) or sid is None:
+            result.append(mention)
+            continue
+        sentence_start = int(sid.group(1))
+        start, end = mention["start"] - sentence_start, mention["end"] - sentence_start
+        span = brazil_nut_span(context, start, end)
+        if (span is None or context[start:end] != mention["text"]
+                or span == (start, end)):
+            result.append(mention)
+            continue
+        new_end = sentence_start + span[1]
+        for other in menciones:
+            if (other is not mention and other.get("sentence_id") == mention["sentence_id"]
+                    and other["start"] < new_end and other["end"] > mention["start"]):
+                raise FuzzyMatchingDataError(
+                    "Completar Brazil nut produciría una mención superpuesta; "
+                    "corrige las extracciones de esa oración antes de publicar"
+                )
+        original = {key: mention.get(key) for key in (
+            "text", "category", "start", "end", "sentence_id", "context", "ambiguity"
+        )}
+        result.append({**mention, "text": context[span[0]:span[1]], "end": new_end,
+                       "_brazil_nut_source_mention": original})
+    return result
+
+
 def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
     planes: list[MentionPlan] = []
     for mencion in menciones:
         texto = _nombre_canonico(mencion["text"])
+        if is_brazil_nut_name(texto):
+            source = mencion.get("_brazil_nut_source_mention")
+            planes.append(MentionPlan(
+                preferred_name=BRAZIL_NUT_CANONICAL_NAME,
+                comparison_key=normalizar_nombre(BRAZIL_NUT_CANONICAL_NAME),
+                strategy="brazil_nut", confidence=100.0,
+                details={"rule": BRAZIL_NUT_RULE_ID,
+                         "source_name": source["text"] if source else texto,
+                         "source_category": mencion["category"],
+                         **({"source_mention": source} if source else {})},
+                canonical_category=BRAZIL_NUT_CANONICAL_CATEGORY,
+            ))
+            continue
         if is_road_pavement_alias(texto):
             planes.append(
                 MentionPlan(
@@ -713,7 +766,7 @@ def _cantidad_acentos(texto: str) -> int:
 
 
 def _seleccionar_plan_representativo(planes: list[MentionPlan]) -> MentionPlan:
-    prioridad = {"road_pavement": 4, "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0}
+    prioridad = {"brazil_nut": 4, "road_pavement": 4, "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0}
     return max(
         planes,
         key=lambda plan: (
@@ -750,10 +803,10 @@ def _decidir_canonica(
         candidata = _mejor_canonica_exacta(exactas, texto_preferido)
         return MatchDecision(candidata, "exact", 100.0, None, "normalized_exact_name")
 
-    if estrategia == "road_pavement":
+    if estrategia in {"road_pavement", "brazil_nut"}:
         return _crear_canonica(
             db, texto_preferido, categoria, candidatos, normalizados,
-            reason="editorial_road_pavement",
+            reason="editorial_" + estrategia,
         )
 
     ids_alias = aliases_por_categoria.get((categoria, nombre_normalizado), set())
@@ -898,7 +951,7 @@ def _metodo_para_mencion(
     mencion: dict[str, Any], plan: MentionPlan, decision: MatchDecision
 ) -> tuple[str, float]:
     texto = _nombre_canonico(mencion["text"])
-    if plan.strategy == "road_pavement":
+    if plan.strategy in {"road_pavement", "brazil_nut"}:
         return "controlled_alias", plan.confidence
     if plan.strategy == "generic_actor" and texto != plan.preferred_name:
         return "morphology", plan.confidence
