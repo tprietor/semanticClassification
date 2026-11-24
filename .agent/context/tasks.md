@@ -1,5 +1,14 @@
 # Tareas
 
+## Retirar State aislado — 24 Nov 2026
+
+- [x] Auditar 29 términos/165 menciones con state o states y contrastar las
+  21 menciones del nodo State con sus categorías originales en los JSON NER.
+- [x] Añadir solo state como nombre completo a la exclusión, en cualquier
+  categoría, conservando los términos compuestos y sin incluir el plural states.
+- [x] Verificar 64 pruebas y 690 subpruebas; preparar publicación respaldada
+  y sincronización Git. Recibos en export/exclude_state_2026_11_24.
+
 ## Retirar Agroforestry Systems — 24 Nov 2026
 
 - [x] Añadir Agroforestry Systems y Agroforestry System por nombre completo,

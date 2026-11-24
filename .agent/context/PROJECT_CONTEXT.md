@@ -20,6 +20,32 @@ El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### Exclusión de State como término aislado — 24 Nov 2026
+
+Tras revisar la polisemia de state, la usuaria pidió excluir cualquier entidad
+extraída únicamente como **State/state**, en cualquier categoría. Se añade
+`state` a la política nominal antes de coocurrencias y métricas. La comparación
+normaliza mayúsculas, formato y puntuación, sin coincidencias por fragmentos
+ni nueva equivalencia de plural: no se excluyen the State, state law, Amazonas
+state, State entities ni states por esta decisión.
+
+El canónico CHAR `489d1209-2465-47e5-a370-39a584cc1aa1` tiene **21 menciones
+en cinco documentos**, de ellas 20 del lote nuevo. Todas estaban clasificadas
+CHAR en el NER original y resueltas por coincidencia exacta. La auditoría
+encontró usos institucionales mezclados con dos falsos positivos claros:
+natural state (condición) y state that (verbo). También detectó Brazil como
+LOC dentro de Brazil nut y un bloque de tabla mal segmentado que genera una
+conexión State–Brazil dudosa. La decisión actual excluye el nodo genérico
+completo; no cambia categorías originales, JSON ni otras entidades.
+
+Política actual: **122 nombres**, 119 canónicos completamente excluidos,
+**7.421 menciones fuera de cálculos**, 908 del lote nuevo de 11. El corpus
+mantiene 59 documentos. Pasaron **64 pruebas y 690 subpruebas** del explorador,
+incluyendo conservación de términos compuestos. Publicación con respaldo,
+comprobación completa de DB/archivos/clusters y sincronización del commit
+aprobado. Auditoría: `export/state_review_2026_11_24/`; recibos de publicación:
+`export/exclude_state_2026_11_24/` y, en EC2, `export/exclude-state-20261124/`.
+
 ### Exclusión explícita de Agroforestry Systems — 24 Nov 2026
 
 La usuaria señaló en la web que Agroforestry Systems seguía visible y pidió

@@ -475,6 +475,7 @@ class ExplorerNetworkTests(unittest.TestCase):
             "Transamazonica Road Region", "new roads", "NEW ROADS.",
             "the Amazon", "THE AMAZON.", "Amazonia", "Amazônia", "AMAZONÍA", "Peruvian Amazon",
             "Agroforestry Systems", "AGROFORESTRY SYSTEMS.", "agroforestry system",
+            "State", "state", "STATE", "State.",
         ):
             with self.subTest(name=name):
                 self.assertIn(entity_exclusion_key(name), keys)
@@ -491,6 +492,7 @@ class ExplorerNetworkTests(unittest.TestCase):
             "road", "road networks", "road access", "road building",
             "rural roads", "logging roads", "railroads", "road construction training",
             "Peruvian Amazon research team", "Amazonian biodiversity research",
+            "the State", "state law", "Amazonas state", "State entities", "states",
         ):
             with self.subTest(name=name):
                 self.assertNotIn(entity_exclusion_key(name), keys)
