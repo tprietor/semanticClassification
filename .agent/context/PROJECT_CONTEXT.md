@@ -20,6 +20,30 @@ El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### Exclusión explícita de Agroforestry Systems — 24 Nov 2026
+
+La usuaria señaló en la web que Agroforestry Systems seguía visible y pidió
+retirarlo. La política anterior excluía Agroforestry como nombre completo y
+los términos que contienen la sigla SAF/SAFs, pero conservaba esta expresión
+inglesa; la corrección añade explícitamente **Agroforestry Systems** y
+**Agroforestry System** en todas las categorías y con normalización de formato.
+No se expande a otros compuestos ingleses no pedidos.
+
+La auditoría identificó el canónico PRAC
+`92b8b72d-3858-426e-aa54-dacd78a74eaf` (768 menciones, 44 documentos)
+y el canónico soft_INFRA `750153a8-eac8-42cb-ab4e-6af51c00b3c1`
+(una mención): 769 menciones adicionales. La política contiene 121 nombres;
+total esperado fuera de los cálculos: 7.400 menciones sobre 59 documentos,
+888 del lote nuevo de 11, y 118 canónicos completamente excluidos. Las tablas
+no cambian y la evidencia original sigue conservada.
+
+Pasaron 64 pruebas y 681 subpruebas del explorador. La publicación del ajuste
+usa una imagen mínima, preservación de ocho tablas y archivos fuente,
+comprobación de network/compare y sincronización Git con el commit aprobado.
+No requiere cambios de frontend ni nueva publicación Vercel. Evidencia y
+recibos: `export/exclude_agroforestry_systems_2026_11_24/`; copia remota:
+`export/exclude-agroforestry-systems-20261124/`.
+
 ### Publicación web y consolidación de código — 24 Nov 2026
 
 Frontend publicado en Vercel desde `b97877d64c1fb1bcc6e85111c561725a804683b5`

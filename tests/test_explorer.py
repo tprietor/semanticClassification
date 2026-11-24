@@ -354,16 +354,16 @@ class ExplorerNetworkTests(unittest.TestCase):
             replace(
                 filters,
                 excluded_entity_names=(),
-                excluded_entity_ids=("agro", "agro_other", "madre", "madre_other"),
+                excluded_entity_ids=("agro", "agro_other", "madre", "madre_other", "systems"),
             ),
         )
 
         self.assertEqual(network, expected)
-        self.assertEqual(_node_ids(network), {"coop", "systems", "rio"})
-        self.assertEqual(network["stages"]["mentions"], len(mentions) - 4)
+        self.assertEqual(_node_ids(network), {"coop", "rio"})
+        self.assertEqual(network["stages"]["mentions"], len(mentions) - 6)
         self.assertEqual(
             {entity["id"] for entity in network["excluded_entities"]},
-            {"agro", "agro_other", "madre", "madre_other"},
+            {"agro", "agro_other", "madre", "madre_other", "systems"},
         )
         restored = build_explorer_network(
             mentions, replace(filters, excluded_entity_names=())
@@ -395,11 +395,11 @@ class ExplorerNetworkTests(unittest.TestCase):
         mentions = [
             MentionRecord(document_id=doc, sentence_id="s1", canonical_id="systems", canonical_name="sistemas agroflorestais",
                           category="PRAC", text=text, start=0, end=len(text), context="Evidence", ambiguity="low")
-            for doc, text in ((DOC_A, "SAF"), (DOC_B, "SAFs"), (DOC_C, "Agroforestry systems"))
+            for doc, text in ((DOC_A, "SAF"), (DOC_B, "SAFs"), (DOC_C, "Forest production systems"))
         ]
         original = list(mentions)
         kept, excluded = exclude_entities(mentions, (), DEFAULT_EXCLUDED_ENTITY_NAMES)
-        self.assertEqual([m.text for m in kept], ["Agroforestry systems"])
+        self.assertEqual([m.text for m in kept], ["Forest production systems"])
         self.assertEqual(excluded[0]["mention_count"], 2)
         self.assertTrue(excluded[0]["partial"])
         self.assertEqual(excluded[0]["remaining_mention_count"], 1)
@@ -474,6 +474,7 @@ class ExplorerNetworkTests(unittest.TestCase):
             "Leticia-Tarapaca road", "Leticia–Tarapaca Road", "NEW ROAD", "ROADS.",
             "Transamazonica Road Region", "new roads", "NEW ROADS.",
             "the Amazon", "THE AMAZON.", "Amazonia", "Amazônia", "AMAZONÍA", "Peruvian Amazon",
+            "Agroforestry Systems", "AGROFORESTRY SYSTEMS.", "agroforestry system",
         ):
             with self.subTest(name=name):
                 self.assertIn(entity_exclusion_key(name), keys)
@@ -481,7 +482,7 @@ class ExplorerNetworkTests(unittest.TestCase):
     def test_editorial_exclusions_do_not_match_substrings_or_invent_municipalities(self):
         keys = {entity_exclusion_key(name) for name in DEFAULT_EXCLUDED_ENTITY_NAMES}
         for name in (
-            "Agroforestry systems", "río Tambopata", "farmer training",
+            "Agroforestry systems research", "río Tambopata", "farmer training",
             "cacao farmer training", "association of seed producers",
             "Peruvian government", "Amazonian biodiversity",
             "Proyecto Especial Madre de Dios research team", "Puerto Maldonado",

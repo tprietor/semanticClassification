@@ -1,5 +1,13 @@
 # Tareas
 
+## Retirar Agroforestry Systems — 24 Nov 2026
+
+- [x] Añadir Agroforestry Systems y Agroforestry System por nombre completo,
+  en cualquier categoría, incluyendo sus variantes de formato.
+- [x] Auditar 769 menciones adicionales y verificar 64 pruebas/681 subpruebas.
+- [x] Preparar publicación con respaldo, comprobación de datos y asociación
+  al commit probado; recibos en export/exclude_agroforestry_systems_2026_11_24.
+
 ## Publicación web y consolidación — 24 Nov 2026
 
 - [x] Revisar todos los cambios pendientes de backend y frontend y comprobar
