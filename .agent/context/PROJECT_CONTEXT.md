@@ -20,6 +20,40 @@ El codebook sirve como especificación
 para la extracción y clasificación mediante LLM en la API, con posterior
 canonicalización, atributos de nodos y análisis de coocurrencia.
 
+### Exclusiones limitadas a LOC — 24 Nov 2026
+
+La usuaria pidió retirar de LOC Km 6, Tambopata, western Amazon, Amazon River,
+Amazonía Central, áreas/Área, zone/zones, Field, property, Puerto Maldonado,
+PEM, Amazonian forests, eastern Peruvian Amazon, Central American region,
+North of Peru, Puerto Maldonado – Iñapari, Southeast of Peru, western part
+of the Amazon basin, Tambopata River y, en una ampliación explícita,
+**Madre de Dios River**. La comparación sigue siendo por nombre completo,
+normalizando formato, mayúsculas, tildes y plurales ya definidos.
+
+Se incorpora una política por categoría, independiente de las exclusiones
+globales anteriores, antes de coocurrencias y métricas. Canónicos y formas
+literales se comprueban en su categoría; no se extiende a otros nombres
+compuestos como Tambopata National Reserve. La API acepta
+`excluded_entity_names_by_category`; un mapa vacío permite desactivar esta
+política para auditorías. La configuración se refleja en la respuesta y en
+la clave inmutable de caché de network/compare.
+
+La auditoría local de 59 documentos encuentra **21 canónicos LOC y 442
+menciones adicionales**. Madre de Dios River aporta una mención. PEM no
+aparece, pero queda cubierto para futuras incorporaciones. Amazonian forests
+conserva sus **15 menciones eco_INFRA**; solo se retiran sus dos menciones LOC.
+La política completa deja fuera **7.863 menciones y 140 canónicos**, todos
+completos; 1.123 menciones pertenecen al lote nuevo de 11 documentos. Las
+otras categorías, PostgreSQL, JSON originales y clusters históricos se
+conservan. Pasaron **219 pruebas y 728 subpruebas** del backend. Auditoría y
+recibos de publicación: `export/exclude_loc_2026_11_24/`; respaldo remoto:
+`export/exclude-loc-20261124/`. No requiere cambios del frontend Vercel.
+AWS confirmó la misma auditoría que Mac y la conservación completa de ocho
+tablas y archivos NER/english/cleaned. La red completa conectada pasa de
+3.551 nodos/13.408 aristas a **3.522 nodos/12.945 aristas**; además de los
+21 canónicos retirados, ocho nodos quedan sin conexiones. La opción de
+desactivar solo la nueva política reproduce exactamente la red anterior.
+
 ### Exclusión de State como término aislado — 24 Nov 2026
 
 Tras revisar la polisemia de state, la usuaria pidió excluir cualquier entidad
@@ -38,7 +72,7 @@ LOC dentro de Brazil nut y un bloque de tabla mal segmentado que genera una
 conexión State–Brazil dudosa. La decisión actual excluye el nodo genérico
 completo; no cambia categorías originales, JSON ni otras entidades.
 
-Política actual: **122 nombres**, 119 canónicos completamente excluidos,
+Política en ese corte: **122 nombres**, 119 canónicos completamente excluidos,
 **7.421 menciones fuera de cálculos**, 908 del lote nuevo de 11. El corpus
 mantiene 59 documentos. Pasaron **64 pruebas y 690 subpruebas** del explorador,
 incluyendo conservación de términos compuestos. Publicación con respaldo,

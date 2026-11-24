@@ -26,6 +26,7 @@ from src.categories import ACTIVE_CATEGORIES
 from src.controlled_vocabulary import is_saf_entity_name
 from src.analysis.explorer import (
     DEFAULT_EXCLUDED_ENTITY_NAMES,
+    DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY,
     PERIODS,
     ExplorerFilterError,
     ExplorerFilters,
@@ -331,6 +332,61 @@ class ExplorerNetworkTests(unittest.TestCase):
             replace(base, excluded_entity_names=()).structural(),
             base.structural(),
         )
+        self.assertNotEqual(
+            replace(base, excluded_entity_names_by_category=()).structural(),
+            base.structural(),
+        )
+        self.assertEqual(
+            hash(base.structural()), hash(replace(base, top_n=10).structural())
+        )
+
+    def test_loc_exclusions_preserve_other_categories_and_run_before_metrics(self):
+        names = dict(DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY)["LOC"]
+        mentions = [MentionRecord(
+            document_id=DOC_A, sentence_id="s1", canonical_id=f"{category}-{index}",
+            canonical_name=name, category=category, text=name.upper(),
+            start=0, end=len(name), context="Evidence", ambiguity="low",
+        ) for category in ("LOC", "eco_INFRA") for index, name in enumerate(names)]
+        original = list(mentions)
+        filters = ExplorerFilters(minimum_node_document_count=1, top_n=None)
+        actual = build_explorer_network(mentions, filters)
+        expected = build_explorer_network(
+            [m for m in mentions if m.category != "LOC"],
+            replace(filters, excluded_entity_names_by_category=()),
+        )
+        self.assertEqual(actual["nodes"], expected["nodes"])
+        self.assertEqual(actual["edges"], expected["edges"])
+        self.assertEqual(actual["stages"], expected["stages"])
+        self.assertEqual(len(actual["excluded_entities"]), len(names))
+        self.assertTrue(all(e["category"] == "LOC" for e in actual["excluded_entities"]))
+        self.assertEqual(mentions, original)
+
+    def test_scoped_exclusions_match_literal_aliases_without_category_spill(self):
+        def mention(identifier, name, text, category="LOC"):
+            return MentionRecord(
+                document_id=DOC_A, sentence_id="s1", canonical_id=identifier,
+                canonical_name=name, category=category, text=text, start=0,
+                end=len(text), context="Evidence", ambiguity="low",
+            )
+        mentions = [
+            mention("forests", "Amazonian forests", "Amazonian forest"),
+            mention("forests", "Amazonian forests", "Amazonian forest", "eco_INFRA"),
+            mention("alias", "Another place", "P.E.M."),
+            mention("alias", "Another place", "Allowed place"),
+            mention("route", "Puerto Maldonado – Iñapari", "Puerto Maldonado-Iñapari"),
+            mention("river", "Madre de Dios River", "MADRE DE DIOS RIVER"),
+            mention("keep", "Tambopata National Reserve", "Tambopata National Reserve"),
+            mention("area", "Área", "ÁREA"),
+        ]
+        kept, excluded = exclude_entities(
+            mentions, (), (), DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY
+        )
+        self.assertEqual(kept, [mentions[1], mentions[3], mentions[6]])
+        by_id = {e["id"]: e for e in excluded}
+        self.assertTrue(by_id["alias"]["partial"])
+        self.assertEqual(by_id["alias"]["remaining_mention_count"], 1)
+        self.assertTrue(by_id["forests"]["partial"])
+        self.assertEqual(exclude_entities(mentions, (), (), ()), (mentions, ()))
 
     def test_default_name_exclusions_match_all_ids_before_building_metrics(self) -> None:
         with patch.dict(
@@ -996,7 +1052,7 @@ class ExplorerServiceTests(unittest.TestCase):
         self.assertEqual(load.call_args.kwargs["document_ids"], [DOC_A, DOC_B])
         self.assertEqual(payload["scope"]["period"], "2021-2023")
         self.assertEqual(payload["scope"]["document_count"], 2)
-        self.assertEqual(payload["version"], "entity-explorer-v1-kas-roads")
+        self.assertEqual(payload["version"], "entity-explorer-v1-kas-scoped-exclusions")
         ExplorerNetworkResponse.model_validate(payload)
 
     def test_single_document_scope_shows_network_with_default_recurrence(self) -> None:
@@ -1226,6 +1282,28 @@ class ExplorerApiTests(unittest.TestCase):
             with self.subTest(invalid=repr(invalid)[:30]):
                 with self.assertRaises(ValidationError):
                     ExplorerNetworkRequest(excluded_entity_names=invalid)
+
+    def test_scoped_name_exclusions_api_defaults_override_and_validation(self):
+        for request in (ExplorerNetworkRequest(), ExplorerCompareRequest()):
+            self.assertEqual(
+                _filters(request, None).excluded_entity_names_by_category,
+                DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY,
+            )
+        request = ExplorerNetworkRequest(excluded_entity_names_by_category={
+            "LOC": [" P.E.M. ", "Área", "ÁREA"], "KNOW": ["Knowledge"], "ATT": ["Attitude"],
+        })
+        filters = _filters(request, 10)
+        self.assertEqual(filters.excluded_entity_names_by_category, (
+            ("KAS", ("attitude", "knowledge")), ("LOC", ("area", "pem")),
+        ))
+        self.assertEqual(_filters(ExplorerNetworkRequest(
+            excluded_entity_names_by_category={}
+        ), 10).excluded_entity_names_by_category, ())
+        for value in ({"INVALID": ["place"]}, {"LOC": ["---"]}, {"LOC": ["x" * 201]},
+                      {"LOC": ["x"] * 501}, None):
+            with self.subTest(value=str(value)[:30]):
+                with self.assertRaises(ValidationError):
+                    ExplorerNetworkRequest(excluded_entity_names_by_category=value)
 
     def test_load_db_mentions_with_empty_document_list_returns_nothing(self) -> None:
         db = Mock()

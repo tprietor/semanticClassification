@@ -72,6 +72,10 @@ def _filters(selection: ExplorerFiltersRequest, top_n: int | None) -> ExplorerFi
             )
         ),
         excluded_entity_names=tuple(selection.excluded_entity_names),
+        excluded_entity_names_by_category=tuple(
+            (category, tuple(names))
+            for category, names in selection.excluded_entity_names_by_category.items()
+        ),
     )
 
 

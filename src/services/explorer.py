@@ -299,6 +299,9 @@ def _filters_summary(filters: ExplorerFilters) -> dict[str, Any]:
         "top_n": filters.top_n,
         "excluded_entity_ids": list(filters.excluded_entity_ids) or None,
         "excluded_entity_names": list(filters.excluded_entity_names),
+        "excluded_entity_names_by_category": {
+            category: list(names) for category, names in filters.excluded_entity_names_by_category
+        },
     }
 
 

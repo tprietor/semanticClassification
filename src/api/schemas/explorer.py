@@ -5,11 +5,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from src.analysis.explorer import (
     DEFAULT_EXCLUDED_ENTITY_NAMES,
+    DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY,
     PERIODS_BY_ID,
     normalize_entity_name,
 )
 from src.api.schemas.network import EdgeWeighting, IncubatorFilter
 from src.categories import STORED_CATEGORIES
+from src.analysis.network_categories import network_category
 
 PeriodId = Literal["2000-2020", "2021-2023", "2024-2026"]
 PeriodFilter = Literal["all", "2000-2020", "2021-2023", "2024-2026"]
@@ -120,10 +122,31 @@ class ExplorerFiltersRequest(BaseModel):
             "Nombres canónicos completos a excluir en cualquier categoría, sin "
             "distinguir mayúsculas, tildes, puntuación ni variantes nominales "
             "de singular/plural. Por defecto usa la lista editorial del explorador; "
-            "no busca por fragmentos. [] desactiva la exclusión por nombre. La lista "
+            "no busca por fragmentos. [] desactiva la exclusión global por nombre. La lista "
             "enviada reemplaza los valores predeterminados"
         ),
     )
+    excluded_entity_names_by_category: dict[
+        Category, Annotated[list[Annotated[str, Field(min_length=1, max_length=200)]], Field(max_length=500)]
+    ] = Field(
+        default_factory=lambda: {code: list(names) for code, names in DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY},
+        description=(
+            "Nombres completos excluidos solo en su categoría, además de la lista global. "
+            "Se comparan canónicos y formas literales con las mismas reglas de formato. "
+            "El mapa enviado reemplaza los valores predeterminados; {} los desactiva"
+        ),
+    )
+
+    @field_validator("excluded_entity_names_by_category")
+    @classmethod
+    def normalize_scoped_excluded_names(cls, values: dict[str, list[str]]) -> dict[str, list[str]]:
+        scoped: dict[str, set[str]] = {}
+        for category, names in values.items():
+            normalized = {normalize_entity_name(name) for name in names}
+            if "" in normalized:
+                raise ValueError("Los nombres a excluir no pueden estar vacíos")
+            scoped.setdefault(network_category(category), set()).update(normalized)
+        return {code: sorted(names) for code, names in sorted(scoped.items()) if names}
 
     @field_validator("excluded_entity_names")
     @classmethod
@@ -270,6 +293,9 @@ class ExplorerFiltersSummary(BaseModel):
     excluded_entity_ids: list[str] | None = None
     excluded_entity_names: list[str] = Field(
         default_factory=lambda: list(DEFAULT_EXCLUDED_ENTITY_NAMES)
+    )
+    excluded_entity_names_by_category: dict[str, list[str]] = Field(
+        default_factory=lambda: {code: list(names) for code, names in DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY}
     )
 
 

@@ -1,5 +1,16 @@
 # Tareas
 
+## Exclusiones limitadas a LOC — 24 Nov 2026
+
+- [x] Incluir todos los lugares pedidos, más Madre de Dios River; verificar
+  21 canónicos LOC y 442 menciones. Registrar PEM como regla sin coincidencias.
+- [x] Aplicar la política por categoría a canónicos y formas literales antes
+  de métricas, conservando Amazonian forests en eco_INFRA y términos compuestos.
+- [x] Exponer configuración auditable de network/compare y separarla en caché;
+  verificar 219 pruebas y 728 subpruebas del backend.
+- [x] Publicar en AWS con respaldo y comprobar datos/archivos/clusters intactos;
+  preparar sincronización Git con el commit probado. Recibos en export/exclude_loc_2026_11_24.
+
 ## Retirar State aislado — 24 Nov 2026
 
 - [x] Auditar 29 términos/165 menciones con state o states y contrastar las

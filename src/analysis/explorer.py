@@ -46,7 +46,7 @@ from src.controlled_vocabulary import (
 )
 from src.analysis.network_categories import NETWORK_CATEGORIES, network_category
 
-EXPLORER_VERSION = "entity-explorer-v1-kas-roads"
+EXPLORER_VERSION = "entity-explorer-v1-kas-scoped-exclusions"
 def normalize_entity_name(value: str) -> str:
     """Normaliza formato, tildes y separadores sin buscar por fragmentos."""
 
@@ -111,6 +111,18 @@ DEFAULT_EXCLUDED_ENTITY_NAMES = tuple(sorted({normalize_entity_name(name) for na
     "smallholder cacao farmers", "cacao cooperatives", "cooperatives", "farmer cooperatives",
 )}))
 
+# Estas decisiones se limitan a LOC; por ejemplo, Amazonian forests se conserva
+# en eco_INFRA. La tupla inmutable participa en la clave de caché de cada red.
+DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("LOC", tuple(sorted({normalize_entity_name(name) for name in (
+        "Km 6", "Tambopata", "western Amazon", "Amazon River", "Amazonía Central",
+        "áreas", "zone", "Área", "zones", "Field", "property", "Puerto Maldonado",
+        "PEM", "Amazonian forests", "eastern Peruvian Amazon", "Central American region",
+        "North of Peru", "Puerto Maldonado – Iñapari", "Southeast of Peru",
+        "western part of the Amazon basin", "Tambopata River", "Madre de Dios River",
+    )}))),
+)
+
 LinkMode = Literal["any", "between", "within", "pairs"]
 RankingMetric = Literal[
     "pagerank",
@@ -169,8 +181,24 @@ class ExplorerFilters:
     # región que da contexto a todo el corpus); ordenadas para la clave de caché.
     excluded_entity_ids: tuple[str, ...] = ()
     excluded_entity_names: tuple[str, ...] = DEFAULT_EXCLUDED_ENTITY_NAMES
+    excluded_entity_names_by_category: tuple[tuple[str, tuple[str, ...]], ...] = (
+        DEFAULT_EXCLUDED_ENTITY_NAMES_BY_CATEGORY
+    )
 
     def __post_init__(self) -> None:
+        scoped: dict[str, set[str]] = {}
+        for code, names in self.excluded_entity_names_by_category:
+            category = network_category(code)
+            if category not in NETWORK_CATEGORIES | LEGACY_CATEGORIES:
+                raise ExplorerFilterError("Categoría de exclusión no permitida: " + code)
+            normalized = {normalize_entity_name(name) for name in names}
+            if "" in normalized:
+                raise ExplorerFilterError("Los nombres a excluir no pueden estar vacíos")
+            scoped.setdefault(category, set()).update(normalized)
+        object.__setattr__(self, "excluded_entity_names_by_category", tuple(
+            (category, tuple(sorted(names))) for category, names in sorted(scoped.items())
+            if names
+        ))
         # URLs y clientes anteriores pueden seguir enviando las tres etiquetas.
         if self.categories is not None:
             object.__setattr__(self, "categories", tuple(dict.fromkeys(
@@ -382,22 +410,34 @@ def exclude_entities(
     mentions: Sequence[MentionRecord],
     excluded_ids: Sequence[str],
     excluded_names: Sequence[str] = (),
+    excluded_names_by_category: Sequence[tuple[str, Sequence[str]]] = (),
 ) -> tuple[list[MentionRecord], tuple[dict[str, Any], ...]]:
     """Quita las menciones de las entidades excluidas y describe cada una.
 
     Los nombres se comparan también con el texto literal: un alias excluido
     no se recupera por tener otro nombre canónico. En ese caso se quita solo
     esa mención, conservando las demás formas del mismo canónico.
+    Las exclusiones por categoría se comprueban tanto para el canónico como
+    para su texto literal, sin afectar menciones de otras categorías.
 
     Una entidad pedida que no aparece en el alcance se informa con nombre nulo, para
     que la interfaz pueda mostrarla y permitir quitarla del filtro.
     """
 
-    if not excluded_ids and not excluded_names:
+    if not excluded_ids and not excluded_names and not excluded_names_by_category:
         return list(mentions), ()
     wanted = set(excluded_ids)
     names = {entity_exclusion_key(name) for name in excluded_names}
     saf_family = entity_exclusion_key("SAF") in names
+    scoped: dict[str, set[str]] = {}
+    for category, values in excluded_names_by_category:
+        scoped.setdefault(category, set()).update(entity_exclusion_key(value) for value in values)
+
+    scoped_canonicals = {
+        (mention.canonical_id, mention.category)
+        for mention in mentions
+        if entity_exclusion_key(mention.canonical_name) in scoped.get(mention.category, ())
+    }
 
     def excluded_name(value: str) -> bool:
         return entity_exclusion_key(value) in names or (saf_family and is_saf_entity_name(value))
@@ -411,6 +451,8 @@ def exclude_entities(
     found: dict[str, dict[str, Any]] = {}
     for mention in mentions:
         if (mention.canonical_id in wanted
+                or (mention.canonical_id, mention.category) in scoped_canonicals
+                or entity_exclusion_key(mention.text) in scoped.get(mention.category, ())
                 or excluded_name(mention.text)):
             entity = found.setdefault(
                 mention.canonical_id,
@@ -461,7 +503,8 @@ def build_ranked_network(
     mentions = [replace(mention, category=network_category(mention.category))
                 for mention in mentions]
     mentions, excluded = exclude_entities(
-        mentions, filters.excluded_entity_ids, filters.excluded_entity_names
+        mentions, filters.excluded_entity_ids, filters.excluded_entity_names,
+        filters.excluded_entity_names_by_category,
     )
     categories = resolve_categories(filters.categories, mentions)
     pairs = resolve_category_pairs(
