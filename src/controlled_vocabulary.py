@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Any
 
 INDIGENOUS_PEOPLES = "Indigenous Peoples"
-LOCAL_COMMUNITIES = "LC"
+LOCAL_COMMUNITIES = "local communities"
 JOINT_COMMUNITIES = "IPLCs"
 COMMUNITY_ACTOR_NAMES = (INDIGENOUS_PEOPLES, LOCAL_COMMUNITIES, JOINT_COMMUNITIES)
 COMMUNITY_ACTOR_RULE_ID = "indigenous-peoples-local-communities"

@@ -63,13 +63,13 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
     def test_community_aliases_resolve_to_three_distinct_nodes(self, read, create):
         groups = {
             "Indigenous Peoples": ["ip", "IP", "IPs", "Indigenous communities", "pueblos indígenas"],
-            "LC": ["lc", "LCs", "local communitie", "comunidades locales"],
+            "local communities": ["LC", "lc", "LCs", "Local Communities", "local communitie", "comunidades locales"],
             "IPLCs": ["ipLcs", "IPLC", "Indigenous peoples and local communities",
                       "comunidades locales e indígenas"],
             "Social Progress Index": ["IPS"],
         }
         targets = {name: canonical(name, "CHAR") for name in groups}
-        read.return_value = [canonical("lc", "CHAR"), *targets.values()]
+        read.return_value = [canonical("LC", "CHAR"), *targets.values()]
         sources = [
             mention(form, "CHAR") if name != "Social Progress Index"
             else dict(mention(form, "CHAR"), context="according to the Social Progress Index (IPS 2021)")
@@ -83,7 +83,7 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
 
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
     def test_joint_source_span_remains_distinct_from_sentence_cooccurrence(self, read):
-        read.return_value = [canonical(name, "CHAR") for name in ("LC", "IPLCs", "Indigenous Peoples")]
+        read.return_value = [canonical(name, "CHAR") for name in ("local communities", "IPLCs", "Indigenous Peoples")]
         joint = "Indigenous Peoples (IPs) and Local Communities (LCs) defend territories."
         separate = "IPs maintain forests; LCs monitor rivers."
         sources = []
@@ -94,7 +94,8 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
                 sources.append(dict(mention(form, "CHAR"), start=offset, end=offset + len(form),
                                     sentence_id=f"s-{start:09}", context=context))
         result, _ = asociar_entidades_canonicas(self.db, sources)
-        self.assertEqual([item["canonical_name"] for item in result], ["IPLCs", "Indigenous Peoples", "LC"])
+        self.assertEqual([item["canonical_name"] for item in result],
+                         ["IPLCs", "Indigenous Peoples", "local communities"])
         self.assertEqual(result[0]["text"], "Indigenous Peoples (IPs) and Local Communities (LCs)")
         self.assertEqual(result[0]["resolution_details"]["source_mentions"], sources[:4])
 
