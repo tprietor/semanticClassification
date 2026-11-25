@@ -546,7 +546,7 @@ class ExplorerNetworkTests(unittest.TestCase):
             "the Amazon", "THE AMAZON.", "Amazonia", "Amazônia", "AMAZONÍA", "Peruvian Amazon",
             "Agroforestry Systems", "AGROFORESTRY SYSTEMS.", "agroforestry system",
             "Agroforestry Practices?", "AGRICULTURAL PRACTICES.",
-            "SAFT", "Agroforest", "Agroforestry Production System.",
+            "SAFT", "Agroforest", "Agroforests", "Agroforestry Production System.",
             "SAFTA", "AFSs-F", "AFSs-A", "AFSs-F-based economy", "creating and managing AFSs",
             "AFSs-A variant", "AFSsF", "AFSs–F variant", "Agroforestry systems (AFSs)",
             "State", "state", "STATE", "State.",
