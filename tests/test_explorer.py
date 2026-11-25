@@ -545,7 +545,7 @@ class ExplorerNetworkTests(unittest.TestCase):
             "Transamazonica Road Region", "new roads", "NEW ROADS.",
             "the Amazon", "THE AMAZON.", "Amazonia", "Amazônia", "AMAZONÍA", "Peruvian Amazon",
             "Agroforestry Systems", "AGROFORESTRY SYSTEMS.", "agroforestry system",
-            "agroforestry practice", "Agroforestry Practices?", "AGRICULTURAL PRACTICES.",
+            "Agroforestry Practices?", "AGRICULTURAL PRACTICES.",
             "State", "state", "STATE", "State.",
         ):
             with self.subTest(name=name):
@@ -556,7 +556,7 @@ class ExplorerNetworkTests(unittest.TestCase):
         for name in (
             "Agroforestry systems research", "río Tambopata", "farmer training",
             "cacao farmer training", "association of seed producers",
-            "indigenous agroforestry practices", "traditional agricultural practices",
+            "agroforestry practice", "indigenous agroforestry practices", "traditional agricultural practices",
             "Peruvian government", "Amazonian biodiversity",
             "Proyecto Especial Madre de Dios research team", "Puerto Maldonado",
             "agroforestry plots", "demonstration plots", "research plots",
