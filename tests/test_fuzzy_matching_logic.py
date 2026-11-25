@@ -120,6 +120,27 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
 
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_conservation_groups_selected_practice_names(self, read, create):
+        variants = (
+            "conservation", "biodiversity conservation", "forest conservation",
+            "Environmental conservation", "conservation initiatives", "conservation and restoration",
+        )
+        requested = [canonical(label, "PRAC") for label in variants]
+        soil_practice = canonical("soil conservation", "PRAC")
+        forest_rule = canonical("forest conservation", "RUL")
+        read.return_value = [*requested, soil_practice, forest_rule]
+        sources = [mention(label, "PRAC") for label in variants] + [
+            mention(soil_practice.canonical_name, soil_practice.category),
+            mention(forest_rule.canonical_name, forest_rule.category),
+        ]
+        result, _ = asociar_entidades_canonicas(self.db, sources)
+        self.assertEqual([item["canonical_id"] for item in result],
+                         [requested[0].id] * len(variants) + [soil_practice.id, forest_rule.id])
+        self.assertEqual([item["text"] for item in result], [item["text"] for item in sources])
+        create.assert_not_called()
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
     def test_community_aliases_resolve_to_three_distinct_nodes(self, read, create):
         groups = {
             "Indigenous Peoples": ["ip", "IP", "IPs", "Indigenous communities", "pueblos indígenas"],

@@ -27,7 +27,7 @@ from src.models.canonical_entity_aliases_repo import CanonicalEntityAliasRepo
 # La extracción admite solo las diez activas; los JSON históricos pueden
 # conservar INFRA hasta su reclasificación contextual.
 VALID_CATEGORIES = STORED_CATEGORIES
-RESOLUTION_VERSION = "deterministic-v9-homegarden"
+RESOLUTION_VERSION = "deterministic-v10-conservation"
 _SINGULAR_PRACTICE_NAMES = {
     "monoculture": "monoculture",
     "monocultures": "monoculture",
@@ -35,7 +35,16 @@ _SINGULAR_PRACTICE_NAMES = {
     "homegardens": "homegarden",
 }
 _EDITORIAL_STRATEGIES = {
-    "brazil_nut", "road_pavement", "community_actor", "protected_areas", *_SINGULAR_PRACTICE_NAMES.values(),
+    "brazil_nut", "road_pavement", "community_actor", "protected_areas", "conservation",
+    *_SINGULAR_PRACTICE_NAMES.values(),
+}
+_CONSERVATION_PRACTICE_NAMES = {
+    "conservation",
+    "biodiversity conservation",
+    "forest conservation",
+    "environmental conservation",
+    "conservation initiatives",
+    "conservation and restoration",
 }
 FUZZY_THRESHOLDS = {
     **dict.fromkeys(VALID_CATEGORIES, 96.0),
@@ -594,7 +603,17 @@ def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
                 )
             )
             continue
-        singular_practice = _SINGULAR_PRACTICE_NAMES.get(normalizar_nombre(texto))
+        clave = normalizar_nombre(texto)
+        if mencion["category"] == "PRAC" and clave in _CONSERVATION_PRACTICE_NAMES:
+            planes.append(MentionPlan(
+                preferred_name="conservation",
+                comparison_key="conservation",
+                strategy="conservation",
+                confidence=100.0,
+                details={"rule": "conservation-equivalence", "source_name": texto},
+            ))
+            continue
+        singular_practice = _SINGULAR_PRACTICE_NAMES.get(clave)
         if mencion["category"] == "PRAC" and singular_practice is not None:
             planes.append(MentionPlan(
                 preferred_name=singular_practice,
@@ -604,7 +623,7 @@ def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
                 details={"rule": f"{singular_practice}-singular", "source_name": texto},
             ))
             continue
-        if mencion["category"] == "PRAC" and normalizar_nombre(texto) in _SAF_ALIASES:
+        if mencion["category"] == "PRAC" and clave in _SAF_ALIASES:
             planes.append(
                 MentionPlan(
                     preferred_name=_SAF_CANONICAL,
@@ -849,7 +868,7 @@ def _decidir_canonica(
         for candidata in candidatos_elegibles
         if normalizados[candidata.id] == nombre_normalizado
     ]
-    if estrategia in {"generic_actor", "community_actor", "monoculture", "homegarden", "protected_areas"}:
+    if estrategia in {"generic_actor", "community_actor", "monoculture", "homegarden", "protected_areas", "conservation"}:
         exactas = [
             candidata
             for candidata in exactas
