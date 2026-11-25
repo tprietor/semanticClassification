@@ -88,6 +88,7 @@ def entity_exclusion_key(value: str) -> str:
 DEFAULT_EXCLUDED_ENTITY_NAMES = tuple(sorted({normalize_entity_name(name) for name in (
     "Agroforestry", "Agroforestry Systems", "Agroforestry System",
     "agroforestry practices", "agricultural practices",
+    "SAFT", "agroforest", "agroforestry production system",
     *SAF_EXCLUDED_ENTITY_NAMES, "ACTO", "association", "AFS", "AFSs", "plot",
     "pilot plots", "plots 5 and 6", "state", "land", "forest", *ROAD_EXCLUDED_ENTITY_NAMES,
     "Madre de Dios", "Perú", "Amazon", "Amazon Region", "Amazon / Amazon Region",
