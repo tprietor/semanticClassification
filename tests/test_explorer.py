@@ -547,6 +547,8 @@ class ExplorerNetworkTests(unittest.TestCase):
             "Agroforestry Systems", "AGROFORESTRY SYSTEMS.", "agroforestry system",
             "Agroforestry Practices?", "AGRICULTURAL PRACTICES.",
             "SAFT", "Agroforest", "Agroforestry Production System.",
+            "SAFTA", "AFSs-F", "AFSs-A", "AFSs-F-based economy", "creating and managing AFSs",
+            "AFSs-A variant", "AFSsF", "AFSs–F variant", "Agroforestry systems (AFSs)",
             "State", "state", "STATE", "State.",
         ):
             with self.subTest(name=name):
@@ -558,7 +560,7 @@ class ExplorerNetworkTests(unittest.TestCase):
             "Agroforestry systems research", "río Tambopata", "farmer training",
             "cacao farmer training", "association of seed producers",
             "agroforestry practice", "indigenous agroforestry practices", "traditional agricultural practices",
-            "SAFTA", "cacao agroforest", "agroforestry production system adoption",
+            "SAFTA certification", "cacao agroforest", "agroforestry production system adoption",
             "Peruvian government", "Amazonian biodiversity",
             "Proyecto Especial Madre de Dios research team", "Puerto Maldonado",
             "agroforestry plots", "demonstration plots", "research plots",

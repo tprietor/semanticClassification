@@ -89,6 +89,8 @@ DEFAULT_EXCLUDED_ENTITY_NAMES = tuple(sorted({normalize_entity_name(name) for na
     "Agroforestry", "Agroforestry Systems", "Agroforestry System",
     "agroforestry practices", "agricultural practices",
     "SAFT", "agroforest", "agroforestry production system",
+    "SAFTA", "AFSs-F", "AFSs-A", "AFSs-F-based economy", "creating and managing AFSs",
+    "AFSs-A variant", "AFSs-F variant", "Agroforestry systems (AFSs)",
     *SAF_EXCLUDED_ENTITY_NAMES, "ACTO", "association", "AFS", "AFSs", "plot",
     "pilot plots", "plots 5 and 6", "state", "land", "forest", *ROAD_EXCLUDED_ENTITY_NAMES,
     "Madre de Dios", "Perú", "Amazon", "Amazon Region", "Amazon / Amazon Region",
