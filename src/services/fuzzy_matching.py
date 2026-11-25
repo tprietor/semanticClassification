@@ -16,6 +16,8 @@ from src.controlled_vocabulary import (
     is_road_pavement_alias,
     COMMUNITY_ACTOR_NAMES, COMMUNITY_ACTOR_RULE_ID,
     community_actor_name, join_community_actor_mentions,
+    PROTECTED_AREAS_CANONICAL_CATEGORY, PROTECTED_AREAS_CANONICAL_NAME,
+    PROTECTED_AREAS_RULE_ID, is_protected_area_alias,
 )
 from src.models.canonical_entities import CanonicalEntity
 from src.models.canonical_entities_repo import CanonicalEntityRepo
@@ -25,7 +27,8 @@ from src.models.canonical_entity_aliases_repo import CanonicalEntityAliasRepo
 # La extracción admite solo las diez activas; los JSON históricos pueden
 # conservar INFRA hasta su reclasificación contextual.
 VALID_CATEGORIES = STORED_CATEGORIES
-RESOLUTION_VERSION = "deterministic-v7-monoculture"
+RESOLUTION_VERSION = "deterministic-v8-protected-areas"
+_EDITORIAL_STRATEGIES = {"brazil_nut", "road_pavement", "community_actor", "monoculture", "protected_areas"}
 FUZZY_THRESHOLDS = {
     **dict.fromkeys(VALID_CATEGORIES, 96.0),
     "CHAR": 93.0,
@@ -545,6 +548,15 @@ def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
                 canonical_category="CHAR",
             ))
             continue
+        if mencion["category"] == PROTECTED_AREAS_CANONICAL_CATEGORY and is_protected_area_alias(texto):
+            planes.append(MentionPlan(
+                preferred_name=PROTECTED_AREAS_CANONICAL_NAME,
+                comparison_key=PROTECTED_AREAS_CANONICAL_NAME,
+                strategy="protected_areas",
+                confidence=100.0,
+                details={"rule": PROTECTED_AREAS_RULE_ID, "source_name": texto},
+            ))
+            continue
         if is_brazil_nut_name(texto):
             source = mencion.get("_brazil_nut_source_mention")
             planes.append(MentionPlan(
@@ -793,7 +805,7 @@ def _cantidad_acentos(texto: str) -> int:
 
 def _seleccionar_plan_representativo(planes: list[MentionPlan]) -> MentionPlan:
     prioridad = {
-        "brazil_nut": 4, "road_pavement": 4, "community_actor": 4, "monoculture": 4,
+        **dict.fromkeys(_EDITORIAL_STRATEGIES, 4),
         "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0,
     }
     return max(
@@ -819,6 +831,8 @@ def _decidir_canonica(
 ) -> MatchDecision:
     if categoria == "CHAR" and estrategia != "community_actor":
         candidatos_elegibles = [c for c in candidatos if c.canonical_name not in COMMUNITY_ACTOR_NAMES]
+    elif categoria == PROTECTED_AREAS_CANONICAL_CATEGORY and estrategia != "protected_areas":
+        candidatos_elegibles = [c for c in candidatos if c.canonical_name != PROTECTED_AREAS_CANONICAL_NAME]
     else:
         candidatos_elegibles = candidatos
     exactas = [
@@ -826,7 +840,7 @@ def _decidir_canonica(
         for candidata in candidatos_elegibles
         if normalizados[candidata.id] == nombre_normalizado
     ]
-    if estrategia in {"generic_actor", "community_actor", "monoculture"}:
+    if estrategia in {"generic_actor", "community_actor", "monoculture", "protected_areas"}:
         exactas = [
             candidata
             for candidata in exactas
@@ -836,7 +850,7 @@ def _decidir_canonica(
         candidata = _mejor_canonica_exacta(exactas, texto_preferido)
         return MatchDecision(candidata, "exact", 100.0, None, "normalized_exact_name")
 
-    if estrategia in {"road_pavement", "brazil_nut", "community_actor", "monoculture"}:
+    if estrategia in _EDITORIAL_STRATEGIES:
         return _crear_canonica(
             db, texto_preferido, categoria, candidatos, normalizados,
             reason="editorial_" + estrategia,
@@ -984,7 +998,7 @@ def _metodo_para_mencion(
     mencion: dict[str, Any], plan: MentionPlan, decision: MatchDecision
 ) -> tuple[str, float]:
     texto = _nombre_canonico(mencion["text"])
-    if plan.strategy in {"road_pavement", "brazil_nut", "community_actor", "monoculture"}:
+    if plan.strategy in _EDITORIAL_STRATEGIES:
         return "controlled_alias", plan.confidence
     if plan.strategy == "generic_actor" and texto != plan.preferred_name:
         return "morphology", plan.confidence

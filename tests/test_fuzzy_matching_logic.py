@@ -60,6 +60,34 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
 
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_protected_areas_consolidates_loc_aliases_and_keeps_other_nodes(self, read, create):
+        target = canonical("protected areas", "LOC")
+        excluded = canonical("non-ACP private lands", "LOC")
+        regulation = canonical("1997 Law of Protected Areas", "RUL")
+        unrelated_acronym = canonical("PAs", "CHAR")
+        read.return_value = [target, excluded, regulation, unrelated_acronym, canonical("ACPs", "LOC")]
+        aliases = ["protected area", "PPAs", "PAs", "ACPs", "ACP", "privately conserved areas",
+                   "private lands", "Private conservation area (ACP)", "Privately protected areas"]
+        sources = [mention(alias, "LOC") for alias in aliases] + [
+            mention(item.canonical_name, item.category) for item in (excluded, regulation, unrelated_acronym)
+        ]
+        result, _ = asociar_entidades_canonicas(self.db, sources)
+        self.assertEqual([item["canonical_id"] for item in result],
+                         [target.id] * len(aliases) + [excluded.id, regulation.id, unrelated_acronym.id])
+        self.assertEqual([item["text"] for item in result], [item["text"] for item in sources])
+        create.assert_not_called()
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_unprotected_areas_cannot_use_protected_areas_as_fuzzy_candidate(self, read, create):
+        read.return_value = [canonical("protected areas", "LOC")]
+        create.return_value = canonical("unprotected areas", "LOC")
+        result, _ = asociar_entidades_canonicas(self.db, [mention("unprotected areas", "LOC")])
+        self.assertEqual(result[0]["canonical_name"], "unprotected areas")
+        create.assert_called_once_with(self.db, canonical_name="unprotected areas", category="LOC")
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
     def test_monoculture_singularizes_only_standalone_practice_names(self, read, create):
         singular = canonical("monoculture", "PRAC")
         plural = canonical("monocultures", "PRAC")

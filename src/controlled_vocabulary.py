@@ -4,6 +4,26 @@ import unicodedata
 from collections import defaultdict
 from typing import Any
 
+PROTECTED_AREAS_CANONICAL_NAME = "protected areas"
+PROTECTED_AREAS_CANONICAL_CATEGORY = "LOC"
+PROTECTED_AREAS_RULE_ID = "protected-areas-equivalence"
+_PROTECTED_AREA_ACRONYM = r"(?:ppas?|pas?|acps?)"
+_PROTECTED_AREA_NAME = (
+    r"(?:protected|privately protected|private protected|privately conserved|"
+    r"private conservation) areas?"
+)
+_PROTECTED_AREA_ALIAS = re.compile(
+    rf"(?:{_PROTECTED_AREA_NAME}(?:\s*\({_PROTECTED_AREA_ACRONYM}\))?"
+    rf"|private lands?|{_PROTECTED_AREA_ACRONYM})",
+    re.IGNORECASE,
+)
+
+
+def is_protected_area_alias(value: str) -> bool:
+    """Recognize whole names and abbreviations for the editorial grouping."""
+    return _PROTECTED_AREA_ALIAS.fullmatch(" ".join(value.split())) is not None
+
+
 INDIGENOUS_PEOPLES = "Indigenous Peoples"
 LOCAL_COMMUNITIES = "local communities"
 JOINT_COMMUNITIES = "IPLCs"
