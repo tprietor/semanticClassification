@@ -14,6 +14,8 @@ from src.controlled_vocabulary import (
     brazil_nut_span, is_brazil_nut_name,
     ROAD_CANONICAL_CATEGORY, ROAD_CANONICAL_NAME, ROAD_RULE_ID,
     is_road_pavement_alias,
+    COMMUNITY_ACTOR_NAMES, COMMUNITY_ACTOR_RULE_ID,
+    community_actor_name, join_community_actor_mentions,
 )
 from src.models.canonical_entities import CanonicalEntity
 from src.models.canonical_entities_repo import CanonicalEntityRepo
@@ -23,7 +25,7 @@ from src.models.canonical_entity_aliases_repo import CanonicalEntityAliasRepo
 # La extracción admite solo las diez activas; los JSON históricos pueden
 # conservar INFRA hasta su reclasificación contextual.
 VALID_CATEGORIES = STORED_CATEGORIES
-RESOLUTION_VERSION = "deterministic-v5-brazil-nut"
+RESOLUTION_VERSION = "deterministic-v6-community-actors"
 FUZZY_THRESHOLDS = {
     **dict.fromkeys(VALID_CATEGORIES, 96.0),
     "CHAR": 93.0,
@@ -378,7 +380,7 @@ def asociar_entidades_canonicas(
             mencion["category"] = legacy_category
         _validar_mencion(mencion, index)
 
-    menciones = _completar_brazil_nut(menciones)
+    menciones = join_community_actor_mentions(_completar_brazil_nut(menciones))
     source_document_id = _normalizar_document_id(document_id)
     canonicas = CanonicalEntityRepo.leer_todas(db)
     aliases = CanonicalEntityAliasRepo.leer_todos(db)
@@ -436,6 +438,7 @@ def asociar_entidades_canonicas(
         }
         mencion_asociada = dict(mencion)
         mencion_asociada.pop("_brazil_nut_source_mention", None)
+        mencion_asociada.pop("_community_source_mentions", None)
         if plan.canonical_category is not None:
             mencion_asociada["category"] = decision.canonical_entity.category
         mencion_asociada["canonical_id"] = decision.canonical_entity.id
@@ -528,6 +531,20 @@ def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
     planes: list[MentionPlan] = []
     for mencion in menciones:
         texto = _nombre_canonico(mencion["text"])
+        community_name = community_actor_name(texto, mencion["category"], mencion.get("context"))
+        if community_name is not None:
+            source_mentions = mencion.get("_community_source_mentions")
+            planes.append(MentionPlan(
+                preferred_name=community_name,
+                comparison_key=normalizar_nombre(community_name),
+                strategy="community_actor",
+                confidence=100.0,
+                details={"rule": COMMUNITY_ACTOR_RULE_ID, "source_name": texto,
+                         "source_category": mencion["category"],
+                         **({"source_mentions": source_mentions} if source_mentions else {})},
+                canonical_category="CHAR",
+            ))
+            continue
         if is_brazil_nut_name(texto):
             source = mencion.get("_brazil_nut_source_mention")
             planes.append(MentionPlan(
@@ -766,7 +783,7 @@ def _cantidad_acentos(texto: str) -> int:
 
 
 def _seleccionar_plan_representativo(planes: list[MentionPlan]) -> MentionPlan:
-    prioridad = {"brazil_nut": 4, "road_pavement": 4, "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0}
+    prioridad = {"brazil_nut": 4, "road_pavement": 4, "community_actor": 4, "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0}
     return max(
         planes,
         key=lambda plan: (
@@ -788,12 +805,16 @@ def _decidir_canonica(
     normalizados: dict[object, str],
     aliases_por_categoria: dict[tuple[str, str], set[object]],
 ) -> MatchDecision:
+    if categoria == "CHAR" and estrategia != "community_actor":
+        candidatos_elegibles = [c for c in candidatos if c.canonical_name not in COMMUNITY_ACTOR_NAMES]
+    else:
+        candidatos_elegibles = candidatos
     exactas = [
         candidata
-        for candidata in candidatos
+        for candidata in candidatos_elegibles
         if normalizados[candidata.id] == nombre_normalizado
     ]
-    if estrategia == "generic_actor":
+    if estrategia in {"generic_actor", "community_actor"}:
         exactas = [
             candidata
             for candidata in exactas
@@ -803,7 +824,7 @@ def _decidir_canonica(
         candidata = _mejor_canonica_exacta(exactas, texto_preferido)
         return MatchDecision(candidata, "exact", 100.0, None, "normalized_exact_name")
 
-    if estrategia in {"road_pavement", "brazil_nut"}:
+    if estrategia in {"road_pavement", "brazil_nut", "community_actor"}:
         return _crear_canonica(
             db, texto_preferido, categoria, candidatos, normalizados,
             reason="editorial_" + estrategia,
@@ -812,7 +833,7 @@ def _decidir_canonica(
     ids_alias = aliases_por_categoria.get((categoria, nombre_normalizado), set())
     if len(ids_alias) == 1:
         canonical_id = next(iter(ids_alias))
-        candidata = next((item for item in candidatos if item.id == canonical_id), None)
+        candidata = next((item for item in candidatos_elegibles if item.id == canonical_id), None)
         alias_char_seguro = not (
             categoria == "CHAR" and len(nombre_normalizado.split()) == 1
         ) or (
@@ -835,7 +856,7 @@ def _decidir_canonica(
         )
 
     candidata_persona = _buscar_nombre_persona_mas_completo(
-        texto_preferido, categoria, candidatos
+        texto_preferido, categoria, candidatos_elegibles
     )
     if candidata_persona is not None:
         return MatchDecision(
@@ -849,7 +870,7 @@ def _decidir_canonica(
     puntajes = sorted(
         (
             (_puntaje(nombre_normalizado, normalizados[candidata.id]), candidata)
-            for candidata in candidatos
+            for candidata in candidatos_elegibles
         ),
         key=lambda item: item[0],
         reverse=True,
@@ -951,7 +972,7 @@ def _metodo_para_mencion(
     mencion: dict[str, Any], plan: MentionPlan, decision: MatchDecision
 ) -> tuple[str, float]:
     texto = _nombre_canonico(mencion["text"])
-    if plan.strategy in {"road_pavement", "brazil_nut"}:
+    if plan.strategy in {"road_pavement", "brazil_nut", "community_actor"}:
         return "controlled_alias", plan.confidence
     if plan.strategy == "generic_actor" and texto != plan.preferred_name:
         return "morphology", plan.confidence

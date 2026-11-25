@@ -60,6 +60,46 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
 
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_community_aliases_resolve_to_three_distinct_nodes(self, read, create):
+        groups = {
+            "Indigenous Peoples": ["ip", "IP", "IPs", "Indigenous communities", "pueblos indígenas"],
+            "LC": ["lc", "LCs", "local communitie", "comunidades locales"],
+            "IPLCs": ["ipLcs", "IPLC", "Indigenous peoples and local communities",
+                      "comunidades locales e indígenas"],
+            "Social Progress Index": ["IPS"],
+        }
+        targets = {name: canonical(name, "CHAR") for name in groups}
+        read.return_value = [canonical("lc", "CHAR"), *targets.values()]
+        sources = [
+            mention(form, "CHAR") if name != "Social Progress Index"
+            else dict(mention(form, "CHAR"), context="according to the Social Progress Index (IPS 2021)")
+            for name, forms in groups.items() for form in forms
+        ]
+        result, _ = asociar_entidades_canonicas(self.db, sources)
+        expected = [targets[name].id for name, forms in groups.items() for _ in forms]
+        self.assertEqual([item["canonical_id"] for item in result], expected)
+        self.assertEqual([item["text"] for item in result], [item["text"] for item in sources])
+        create.assert_not_called()
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_joint_source_span_remains_distinct_from_sentence_cooccurrence(self, read):
+        read.return_value = [canonical(name, "CHAR") for name in ("LC", "IPLCs", "Indigenous Peoples")]
+        joint = "Indigenous Peoples (IPs) and Local Communities (LCs) defend territories."
+        separate = "IPs maintain forests; LCs monitor rivers."
+        sources = []
+        for start, context, texts in ((10, joint, ("Indigenous Peoples", "IPs", "Local Communities", "LCs")),
+                                      (200, separate, ("IPs", "LCs"))):
+            for form in texts:
+                offset = start + context.index(form)
+                sources.append(dict(mention(form, "CHAR"), start=offset, end=offset + len(form),
+                                    sentence_id=f"s-{start:09}", context=context))
+        result, _ = asociar_entidades_canonicas(self.db, sources)
+        self.assertEqual([item["canonical_name"] for item in result], ["IPLCs", "Indigenous Peoples", "LC"])
+        self.assertEqual(result[0]["text"], "Indigenous Peoples (IPs) and Local Communities (LCs)")
+        self.assertEqual(result[0]["resolution_details"]["source_mentions"], sources[:4])
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
     def test_brazil_nut_repairs_exact_occurrence_and_preserves_country_and_source(self, read, create):
         country, resource = canonical("Brazil", "LOC"), canonical("Brazil nut", "eco_INFRA")
         read.return_value = [country, resource]
