@@ -60,6 +60,25 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
 
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_monoculture_singularizes_only_standalone_practice_names(self, read, create):
+        singular = canonical("monoculture", "PRAC")
+        plural = canonical("monocultures", "PRAC")
+        compounds = [canonical(label, "PRAC") for label in (
+            "cacao monoculture", "Coffee Monoculture System", "abandonment of monocultures",
+        )]
+        read.return_value = [singular, plural, *compounds]
+        sources = [mention(label, "PRAC") for label in (
+            "monoculture", "Monocultures", "monocultures",
+            *(compound.canonical_name for compound in compounds),
+        )]
+        result, _ = asociar_entidades_canonicas(self.db, sources)
+        self.assertEqual([item["canonical_id"] for item in result],
+                         [singular.id] * 3 + [compound.id for compound in compounds])
+        self.assertEqual([item["text"] for item in result], [item["text"] for item in sources])
+        create.assert_not_called()
+
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
     def test_community_aliases_resolve_to_three_distinct_nodes(self, read, create):
         groups = {
             "Indigenous Peoples": ["ip", "IP", "IPs", "Indigenous communities", "pueblos indígenas"],

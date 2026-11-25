@@ -25,7 +25,7 @@ from src.models.canonical_entity_aliases_repo import CanonicalEntityAliasRepo
 # La extracción admite solo las diez activas; los JSON históricos pueden
 # conservar INFRA hasta su reclasificación contextual.
 VALID_CATEGORIES = STORED_CATEGORIES
-RESOLUTION_VERSION = "deterministic-v6-community-actors"
+RESOLUTION_VERSION = "deterministic-v7-monoculture"
 FUZZY_THRESHOLDS = {
     **dict.fromkeys(VALID_CATEGORIES, 96.0),
     "CHAR": 93.0,
@@ -574,6 +574,15 @@ def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
                 )
             )
             continue
+        if mencion["category"] == "PRAC" and normalizar_nombre(texto) in {"monoculture", "monocultures"}:
+            planes.append(MentionPlan(
+                preferred_name="monoculture",
+                comparison_key="monoculture",
+                strategy="monoculture",
+                confidence=100.0,
+                details={"rule": "monoculture-singular", "source_name": texto},
+            ))
+            continue
         if mencion["category"] == "PRAC" and normalizar_nombre(texto) in _SAF_ALIASES:
             planes.append(
                 MentionPlan(
@@ -783,7 +792,10 @@ def _cantidad_acentos(texto: str) -> int:
 
 
 def _seleccionar_plan_representativo(planes: list[MentionPlan]) -> MentionPlan:
-    prioridad = {"brazil_nut": 4, "road_pavement": 4, "community_actor": 4, "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0}
+    prioridad = {
+        "brazil_nut": 4, "road_pavement": 4, "community_actor": 4, "monoculture": 4,
+        "controlled_alias": 3, "generic_actor": 2, "document_person": 1, "standard": 0,
+    }
     return max(
         planes,
         key=lambda plan: (
@@ -814,7 +826,7 @@ def _decidir_canonica(
         for candidata in candidatos_elegibles
         if normalizados[candidata.id] == nombre_normalizado
     ]
-    if estrategia in {"generic_actor", "community_actor"}:
+    if estrategia in {"generic_actor", "community_actor", "monoculture"}:
         exactas = [
             candidata
             for candidata in exactas
@@ -824,7 +836,7 @@ def _decidir_canonica(
         candidata = _mejor_canonica_exacta(exactas, texto_preferido)
         return MatchDecision(candidata, "exact", 100.0, None, "normalized_exact_name")
 
-    if estrategia in {"road_pavement", "brazil_nut", "community_actor"}:
+    if estrategia in {"road_pavement", "brazil_nut", "community_actor", "monoculture"}:
         return _crear_canonica(
             db, texto_preferido, categoria, candidatos, normalizados,
             reason="editorial_" + estrategia,
@@ -972,7 +984,7 @@ def _metodo_para_mencion(
     mencion: dict[str, Any], plan: MentionPlan, decision: MatchDecision
 ) -> tuple[str, float]:
     texto = _nombre_canonico(mencion["text"])
-    if plan.strategy in {"road_pavement", "brazil_nut", "community_actor"}:
+    if plan.strategy in {"road_pavement", "brazil_nut", "community_actor", "monoculture"}:
         return "controlled_alias", plan.confidence
     if plan.strategy == "generic_actor" and texto != plan.preferred_name:
         return "morphology", plan.confidence
