@@ -27,8 +27,16 @@ from src.models.canonical_entity_aliases_repo import CanonicalEntityAliasRepo
 # La extracción admite solo las diez activas; los JSON históricos pueden
 # conservar INFRA hasta su reclasificación contextual.
 VALID_CATEGORIES = STORED_CATEGORIES
-RESOLUTION_VERSION = "deterministic-v8-protected-areas"
-_EDITORIAL_STRATEGIES = {"brazil_nut", "road_pavement", "community_actor", "monoculture", "protected_areas"}
+RESOLUTION_VERSION = "deterministic-v9-homegarden"
+_SINGULAR_PRACTICE_NAMES = {
+    "monoculture": "monoculture",
+    "monocultures": "monoculture",
+    "homegarden": "homegarden",
+    "homegardens": "homegarden",
+}
+_EDITORIAL_STRATEGIES = {
+    "brazil_nut", "road_pavement", "community_actor", "protected_areas", *_SINGULAR_PRACTICE_NAMES.values(),
+}
 FUZZY_THRESHOLDS = {
     **dict.fromkeys(VALID_CATEGORIES, 96.0),
     "CHAR": 93.0,
@@ -586,13 +594,14 @@ def _planear_menciones(menciones: list[dict[str, Any]]) -> list[MentionPlan]:
                 )
             )
             continue
-        if mencion["category"] == "PRAC" and normalizar_nombre(texto) in {"monoculture", "monocultures"}:
+        singular_practice = _SINGULAR_PRACTICE_NAMES.get(normalizar_nombre(texto))
+        if mencion["category"] == "PRAC" and singular_practice is not None:
             planes.append(MentionPlan(
-                preferred_name="monoculture",
-                comparison_key="monoculture",
-                strategy="monoculture",
+                preferred_name=singular_practice,
+                comparison_key=singular_practice,
+                strategy=singular_practice,
                 confidence=100.0,
-                details={"rule": "monoculture-singular", "source_name": texto},
+                details={"rule": f"{singular_practice}-singular", "source_name": texto},
             ))
             continue
         if mencion["category"] == "PRAC" and normalizar_nombre(texto) in _SAF_ALIASES:
@@ -840,7 +849,7 @@ def _decidir_canonica(
         for candidata in candidatos_elegibles
         if normalizados[candidata.id] == nombre_normalizado
     ]
-    if estrategia in {"generic_actor", "community_actor", "monoculture", "protected_areas"}:
+    if estrategia in {"generic_actor", "community_actor", "monoculture", "homegarden", "protected_areas"}:
         exactas = [
             candidata
             for candidata in exactas

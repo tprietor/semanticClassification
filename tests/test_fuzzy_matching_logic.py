@@ -105,6 +105,19 @@ class FuzzyMatchingLogicTests(unittest.TestCase):
         self.assertEqual([item["text"] for item in result], [item["text"] for item in sources])
         create.assert_not_called()
 
+    @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
+    def test_homegardens_resolves_to_existing_homegarden_in_prac(self, read):
+        target = canonical("homegarden", "PRAC")
+        spaced = canonical("home gardens", "PRAC")
+        loc = canonical("homegardens", "LOC")
+        read.return_value = [target, spaced, loc, canonical("homegardens", "PRAC")]
+        sources = [mention("Homegardens", "PRAC"), mention("HOMEGARDENS", "PRAC"),
+                   mention("homegarden", "PRAC"), mention("home gardens", "PRAC"),
+                   mention("homegardens", "LOC")]
+        result, _ = asociar_entidades_canonicas(self.db, sources)
+        self.assertEqual([item["canonical_id"] for item in result], [target.id] * 3 + [spaced.id, loc.id])
+        self.assertEqual([item["text"] for item in result], [item["text"] for item in sources])
+
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.crear")
     @patch("src.services.fuzzy_matching.CanonicalEntityRepo.leer_todas")
     def test_community_aliases_resolve_to_three_distinct_nodes(self, read, create):
