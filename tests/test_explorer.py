@@ -838,11 +838,11 @@ class CompareRankingsTests(unittest.TestCase):
         )
 
         comparison = compare_rankings(
-            {"2021-2023": early, "2024-2026": late}, metric="degree", top_k=1
+            {"2020-2023": early, "2024-2026": late}, metric="degree", top_k=1
         )
 
         self.assertEqual(
-            comparison["central_by_period"]["2021-2023"]["degree"]["id"], "coop"
+            comparison["central_by_period"]["2020-2023"]["degree"]["id"], "coop"
         )
         self.assertEqual(
             comparison["central_by_period"]["2024-2026"]["degree"]["id"], "vivero"
@@ -900,21 +900,22 @@ class ExplorerServiceTests(unittest.TestCase):
             "productive_sector", compiled_where(ExplorerScope(productive_sector=None))
         )
 
-    def test_periods_are_chronological_and_include_2000_2020(self) -> None:
+    def test_periods_place_2020_in_the_middle_group(self) -> None:
         self.assertEqual(
             [period["id"] for period in PERIODS],
-            ["2000-2020", "2021-2023", "2024-2026"],
+            ["2000-2019", "2020-2023", "2024-2026"],
         )
         self.assertEqual(ExplorerCompareRequest().periods, [p["id"] for p in PERIODS])
-        self.assertEqual(ExplorerNetworkRequest(period="2000-2020").period, "2000-2020")
+        self.assertIn("BETWEEN 2000 AND 2019", self._where(ExplorerScope(period="2000-2019")))
+        self.assertIn("BETWEEN 2020 AND 2023", self._where(ExplorerScope(period="2020-2023")))
+        self.assertIn("BETWEEN 2024 AND 2026", self._where(ExplorerScope(period="2024-2026")))
 
-        db = Mock()
-        db.execute.return_value.all.return_value = []
-        _scoped_documents(db, ExplorerScope(period="2000-2020"))
-        where = db.execute.call_args.args[0].whereclause.compile(
-            compile_kwargs={"literal_binds": True}
+    def test_old_period_ids_map_to_the_updated_ranges(self) -> None:
+        self.assertEqual(ExplorerNetworkRequest(period="2000-2020").period, "2000-2019")
+        self.assertEqual(
+            ExplorerCompareRequest(periods=["2021-2023", "2024-2026"]).periods,
+            ["2020-2023", "2024-2026"],
         )
-        self.assertIn("BETWEEN 2000 AND 2020", str(where))
 
     @staticmethod
     def _where(scope: ExplorerScope) -> str:
@@ -1066,11 +1067,11 @@ class ExplorerServiceTests(unittest.TestCase):
             ) as load,
         ):
             payload = ExplorerService.network(
-                Mock(), ExplorerScope(period="2021-2023"), ExplorerFilters()
+                Mock(), ExplorerScope(period="2020-2023"), ExplorerFilters()
             )
 
         self.assertEqual(load.call_args.kwargs["document_ids"], [DOC_A, DOC_B])
-        self.assertEqual(payload["scope"]["period"], "2021-2023")
+        self.assertEqual(payload["scope"]["period"], "2020-2023")
         self.assertEqual(payload["scope"]["document_count"], 2)
         self.assertEqual(payload["version"], "entity-explorer-v1-kas-scoped-exclusions")
         ExplorerNetworkResponse.model_validate(payload)
@@ -1215,14 +1216,14 @@ class ExplorerServiceTests(unittest.TestCase):
                 Mock(),
                 ExplorerScope(),
                 ExplorerFilters(top_n=10),
-                periods=["2024-2026", "2021-2023"],
+                periods=["2024-2026", "2020-2023"],
                 top_k=3,
             )
 
-        self.assertEqual(calls, [("2021-2023", None), ("2024-2026", None)])
+        self.assertEqual(calls, [("2020-2023", None), ("2024-2026", None)])
         # La respuesta debe cumplir el contrato público completo.
         ExplorerCompareResponse.model_validate(payload)
-        self.assertEqual(payload["periods"], ["2021-2023", "2024-2026"])
+        self.assertEqual(payload["periods"], ["2020-2023", "2024-2026"])
         self.assertEqual(len(payload["period_summaries"]), 2)
 
 
@@ -1241,7 +1242,7 @@ class ExplorerApiTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ExplorerNetworkRequest(link_mode="pairs", category_pairs=[["CHAR"]])
         with self.assertRaises(ValidationError):
-            ExplorerCompareRequest(periods=["2021-2023"])
+            ExplorerCompareRequest(periods=["2020-2023"])
 
     def test_network_endpoint_maps_filter_errors_to_422(self) -> None:
         body = ExplorerNetworkRequest(categories=["CHAR"], link_mode="between")

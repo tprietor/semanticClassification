@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from src.analysis.explorer import (
     DEFAULT_EXCLUDED_ENTITY_NAMES,
@@ -13,8 +13,20 @@ from src.api.schemas.network import EdgeWeighting, IncubatorFilter
 from src.categories import STORED_CATEGORIES
 from src.analysis.network_categories import network_category
 
-PeriodId = Literal["2000-2020", "2021-2023", "2024-2026"]
-PeriodFilter = Literal["all", "2000-2020", "2021-2023", "2024-2026"]
+_LEGACY_PERIOD_IDS = {"2000-2020": "2000-2019", "2021-2023": "2020-2023"}
+
+
+def _normalize_period_id(value: object) -> object:
+    if isinstance(value, str):
+        return _LEGACY_PERIOD_IDS.get(value, value)
+    return value
+
+
+PeriodId = Annotated[Literal["2000-2019", "2020-2023", "2024-2026"], BeforeValidator(_normalize_period_id)]
+PeriodFilter = Annotated[
+    Literal["all", "2000-2019", "2020-2023", "2024-2026"],
+    BeforeValidator(_normalize_period_id),
+]
 ProductiveSectorFilter = Literal["all", "Agroforestry"]
 LinkMode = Literal["any", "between", "within", "pairs"]
 DocumentTypeMode = Literal["only", "exclude"]
